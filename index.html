@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Hearts: Card Game</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <!-- Lucide icons or SVG equivalents -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="app">
+        <!-- Header Nav -->
+        <header class="game-header">
+            <div class="brand-title">
+                <span class="brand-heart">♥</span>
+                <span>Hearts</span>
+            </div>
+
+            <div class="header-actions">
+                <button id="btn-undo" class="icon-btn" title="Undo Last Trick" disabled>
+                    <span>↺</span> Undo
+                </button>
+                <button id="btn-hint" class="icon-btn" title="Tactical Hint">
+                    <span>💡</span> Hint
+                </button>
+                <button id="btn-scoreboard" class="icon-btn" title="Scoreboard Ledger">
+                    <span>📊</span> Scores
+                </button>
+                <button id="btn-stats" class="icon-btn" title="Career Statistics">
+                    <span>🏆</span> Stats
+                </button>
+                <button id="btn-rules" class="icon-btn" title="Game Rules">
+                    <span>📖</span> Rules
+                </button>
+                <button id="btn-settings" class="icon-btn" title="Settings">
+                    <span>⚙</span>
+                </button>
+                <button id="btn-toggle-sound" class="icon-btn" title="Sound Toggle">
+                    🔊
+                </button>
+                <button id="btn-online" class="icon-btn btn-online-highlight" title="Play Online with Friends">
+                    <span>🌐</span> Online
+                </button>
+                <button id="btn-new-game" class="icon-btn btn-primary-action" title="New Game">
+                    + New Game
+                </button>
+            </div>
+        </header>
+
+        <!-- Poker Table Surface -->
+        <main id="poker-table" class="table-surface theme-green">
+            <!-- Subtle Watermark -->
+            <div class="felt-logo">HEARTS</div>
+
+            <!-- Top Status Banner -->
+            <div id="status-banner" class="status-banner">
+                Dealing cards...
+            </div>
+
+            <!-- Hint Tooltip Overlay -->
+            <div id="hint-tooltip" class="hint-tooltip hidden"></div>
+
+            <!-- Center Trick Field -->
+            <div id="center-trick" class="center-trick-area"></div>
+
+            <!-- Passing Phase Action Bar -->
+            <div id="pass-controls" class="pass-controls hidden">
+                <span id="pass-direction-text" class="pass-instruction">Pass 3 cards to the Left</span>
+                <button id="btn-confirm-pass" class="icon-btn btn-primary-action" disabled>
+                    Pass 3 Cards (0/3)
+                </button>
+            </div>
+
+            <!-- Online In-Game HUD & Emote Bar -->
+            <div id="online-hud" class="online-hud hidden">
+                <div class="online-room-badge">
+                    <span class="online-indicator-dot"></span>
+                    <span id="hud-room-code">Room: HEARTS-XXXX</span>
+                    <button id="btn-hud-copy" class="btn-mini" title="Copy Invite Link">📋 Link</button>
+                </div>
+                <div class="emote-bar">
+                    <button class="btn-emote" data-emote="👍" title="Thumbs Up">👍</button>
+                    <button class="btn-emote" data-emote="😂" title="Laugh">😂</button>
+                    <button class="btn-emote" data-emote="💔" title="Broken Heart">💔</button>
+                    <button class="btn-emote" data-emote="😱" title="Shocked">😱</button>
+                    <button class="btn-emote" data-emote="🌕" title="Moon Shot">🌕</button>
+                    <button class="btn-emote" data-emote="👑" title="Victory">👑</button>
+                    <div class="chat-input-wrapper">
+                        <input type="text" id="hud-chat-input" placeholder="Message..." maxlength="35">
+                        <button id="btn-send-chat" class="btn-mini">Send</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Player Station: North -->
+            <div id="player-north" class="player-station pos-north">
+                <div class="station-speech-bubble hidden"></div>
+                <div class="player-badge">
+                    <div class="turn-glow"></div>
+                    <div class="avatar-circle">🦊</div>
+                    <div class="player-info">
+                        <span class="player-name">North Bot</span>
+                        <div class="player-scores">
+                            <span class="player-round-score">0 pts</span>
+                            <span class="player-total-score">Total: 0</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="hand-cards"></div>
+                <span class="card-count-badge">13 cards</span>
+            </div>
+
+            <!-- Player Station: West -->
+            <div id="player-west" class="player-station pos-west">
+                <div class="station-speech-bubble hidden"></div>
+                <div class="player-badge">
+                    <div class="turn-glow"></div>
+                    <div class="avatar-circle">🤖</div>
+                    <div class="player-info">
+                        <span class="player-name">West Bot</span>
+                        <div class="player-scores">
+                            <span class="player-round-score">0 pts</span>
+                            <span class="player-total-score">Total: 0</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="hand-cards"></div>
+                <span class="card-count-badge">13 cards</span>
+            </div>
+
+            <!-- Player Station: East -->
+            <div id="player-east" class="player-station pos-east">
+                <div class="station-speech-bubble hidden"></div>
+                <div class="player-badge">
+                    <div class="turn-glow"></div>
+                    <div class="avatar-circle">🦉</div>
+                    <div class="player-info">
+                        <span class="player-name">East Bot</span>
+                        <div class="player-scores">
+                            <span class="player-round-score">0 pts</span>
+                            <span class="player-total-score">Total: 0</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="hand-cards"></div>
+                <span class="card-count-badge">13 cards</span>
+            </div>
+
+            <!-- Player Station: South (Human / Active Player) -->
+            <div id="player-south" class="player-station pos-south">
+                <div class="station-speech-bubble hidden"></div>
+                <div class="player-badge">
+                    <div class="turn-glow"></div>
+                    <div class="avatar-circle">🧑‍💼</div>
+                    <div class="player-info">
+                        <span class="player-name">You</span>
+                        <div class="player-scores">
+                            <span class="player-round-score">0 pts</span>
+                            <span class="player-total-score">Total: 0</span>
+                        </div>
+                    </div>
+                </div>
+                <div id="player-hand" class="hand-cards"></div>
+            </div>
+        </main>
+    </div>
+
+    <!-- ==========================================================================
+         MODALS
+         ========================================================================== -->
+
+    <!-- Scoreboard Ledger Modal -->
+    <div id="modal-scoreboard" class="modal-backdrop hidden">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h2 class="modal-title">Match Scoreboard</h2>
+                <button class="btn-close" data-close-modal="modal-scoreboard">&times;</button>
+            </div>
+            <div class="modal-body">
+                <table class="scoreboard-table">
+                    <thead>
+                        <tr>
+                            <th>Round</th>
+                            <th class="scoreboard-player-header">You</th>
+                            <th class="scoreboard-player-header">West</th>
+                            <th class="scoreboard-player-header">North</th>
+                            <th class="scoreboard-player-header">East</th>
+                        </tr>
+                    </thead>
+                    <tbody id="scoreboard-table-body"></tbody>
+                </table>
+            </div>
+            <div class="modal-footer">
+                <button id="btn-next-round" class="icon-btn btn-primary-action hidden">Next Round →</button>
+                <button class="icon-btn" data-close-modal="modal-scoreboard">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Career Stats Modal -->
+    <div id="modal-stats" class="modal-backdrop hidden">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h2 class="modal-title">Career Statistics</h2>
+                <button class="btn-close" data-close-modal="modal-stats">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
+                    <div style="background: #f8fafc; padding: 1rem; border-radius: 8px; text-align: center; border: 1px solid #e2e8f0;">
+                        <span style="font-size: 0.8rem; color: #64748b; text-transform: uppercase;">Games Played</span>
+                        <h3 id="stat-games-played" style="font-size: 1.8rem; font-weight: 800; color: #0f172a;">0</h3>
+                    </div>
+                    <div style="background: #f8fafc; padding: 1rem; border-radius: 8px; text-align: center; border: 1px solid #e2e8f0;">
+                        <span style="font-size: 0.8rem; color: #64748b; text-transform: uppercase;">Victories</span>
+                        <h3 id="stat-games-won" style="font-size: 1.8rem; font-weight: 800; color: #16a34a;">0</h3>
+                    </div>
+                    <div style="background: #f8fafc; padding: 1rem; border-radius: 8px; text-align: center; border: 1px solid #e2e8f0;">
+                        <span style="font-size: 0.8rem; color: #64748b; text-transform: uppercase;">Win Rate</span>
+                        <h3 id="stat-win-rate" style="font-size: 1.8rem; font-weight: 800; color: #2563eb;">0%</h3>
+                    </div>
+                    <div style="background: #f8fafc; padding: 1rem; border-radius: 8px; text-align: center; border: 1px solid #e2e8f0;">
+                        <span style="font-size: 0.8rem; color: #64748b; text-transform: uppercase;">Moon Shots 🌕</span>
+                        <h3 id="stat-moon-shots" style="font-size: 1.8rem; font-weight: 800; color: #d97706;">0</h3>
+                    </div>
+                    <div style="grid-column: span 2; background: #f8fafc; padding: 1rem; border-radius: 8px; text-align: center; border: 1px solid #e2e8f0;">
+                        <span style="font-size: 0.8rem; color: #64748b; text-transform: uppercase;">Best (Lowest) Final Score</span>
+                        <h3 id="stat-best-score" style="font-size: 1.8rem; font-weight: 800; color: #059669;">-</h3>
+                    </div>
+                </div>
+                <h4 style="font-weight: 700; margin-bottom: 0.5rem; color: #334155;">Recent Matches</h4>
+                <div id="stat-recent-matches" style="display: flex; flex-direction: column; gap: 0.4rem; max-height: 180px; overflow-y: auto;"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="icon-btn" data-close-modal="modal-stats">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="modal-settings" class="modal-backdrop hidden">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h2 class="modal-title">Game Settings</h2>
+                <button class="btn-close" data-close-modal="modal-settings">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div style="display: flex; flex-direction: column; gap: 1rem;">
+                    <div>
+                        <label style="display: block; font-weight: 700; margin-bottom: 0.35rem;">Table Felt Theme</label>
+                        <select id="setting-theme" style="width: 100%; padding: 0.5rem; border-radius: 6px; border: 1px solid #cbd5e1;">
+                            <option value="green">Classic Casino Green</option>
+                            <option value="navy">Midnight Navy Felt</option>
+                            <option value="crimson">Royale Crimson Felt</option>
+                            <option value="wood">Rich Mahogany Wood</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label style="display: block; font-weight: 700; margin-bottom: 0.35rem;">Card Back Pattern</label>
+                        <select id="setting-card-back" style="width: 100%; padding: 0.5rem; border-radius: 6px; border: 1px solid #cbd5e1;">
+                            <option value="blue">Sapphire Blue Bicycle</option>
+                            <option value="red">Royal Crimson Diamond</option>
+                            <option value="gold">Golden Sovereign</option>
+                            <option value="dark">Cyber Slate</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label style="display: block; font-weight: 700; margin-bottom: 0.35rem;">Animation Speed</label>
+                        <select id="setting-speed" style="width: 100%; padding: 0.5rem; border-radius: 6px; border: 1px solid #cbd5e1;">
+                            <option value="slow">Relaxed (Slow)</option>
+                            <option value="normal" selected>Normal</option>
+                            <option value="fast">Fast</option>
+                            <option value="instant">Instant</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label style="display: block; font-weight: 700; margin-bottom: 0.35rem;">Target End Score</label>
+                        <select id="setting-target-score" style="width: 100%; padding: 0.5rem; border-radius: 6px; border: 1px solid #cbd5e1;">
+                            <option value="50">Quick Match (50 Points)</option>
+                            <option value="75">Medium Match (75 Points)</option>
+                            <option value="100" selected>Standard Match (100 Points)</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label style="display: block; font-weight: 700; margin-bottom: 0.35rem;">AI Bot Difficulty</label>
+                        <select id="setting-difficulty" style="width: 100%; padding: 0.5rem; border-radius: 6px; border: 1px solid #cbd5e1;">
+                            <option value="hard" selected>Master (Full Heuristics & Moon Defense)</option>
+                            <option value="medium">Intermediate</option>
+                            <option value="easy">Casual</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="icon-btn btn-primary-action" data-close-modal="modal-settings">Save & Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rules Modal -->
+    <div id="modal-rules" class="modal-backdrop hidden">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h2 class="modal-title">How to Play Hearts</h2>
+                <button class="btn-close" data-close-modal="modal-rules">&times;</button>
+            </div>
+            <div class="modal-body" style="font-size: 0.9rem; line-height: 1.6;">
+                <p><strong>Goal:</strong> Have the <em>lowest</em> score when any player reaches 100 points!</p>
+                <br>
+                <p><strong>Penalty Points:</strong></p>
+                <ul style="margin-left: 1.25rem;">
+                    <li>Each <strong>Heart (♥)</strong> = 1 penalty point.</li>
+                    <li>The <strong>Queen of Spades (♠Q)</strong> = 13 penalty points!</li>
+                    <li>All other cards = 0 points. (Total points in deck = 26).</li>
+                </ul>
+                <br>
+                <p><strong>Passing Cards:</strong></p>
+                <p>At the start of each round, you choose 3 cards to pass:</p>
+                <ul style="margin-left: 1.25rem;">
+                    <li><strong>Classic Mode:</strong> Round 1 (Left), Round 2 (Right), Round 3 (Across), Round 4 (Hold).</li>
+                    <li><strong>Triple Pass Mode (Custom):</strong> Every round features 3 sequential passes: Left &rarr; Front/Across &rarr; Right! You may pass cards you just received.</li>
+                </ul>
+                <br>
+                <p><strong>Trick Rules:</strong></p>
+                <ul style="margin-left: 1.25rem;">
+                    <li>The player holding the <strong>2 of Clubs (2♣)</strong> must lead the first trick.</li>
+                    <li>Players must follow suit if possible. If void, you may discard any card (except on Trick 1, no points can be played).</li>
+                    <li><strong>Breaking Hearts:</strong> Hearts cannot be led until someone has discarded a heart on an earlier trick.</li>
+                    <li>The highest card of the suit led wins the trick and leads next.</li>
+                </ul>
+                <br>
+                <p><strong>Shooting the Moon:</strong></p>
+                <p>If you take <em>all 13 Hearts AND the Queen of Spades</em> (all 26 points) in a single hand, you get <strong>0 points</strong> and all three opponents get <strong>+26 penalty points</strong>!</p>
+            </div>
+            <div class="modal-footer">
+                <button class="icon-btn" data-close-modal="modal-rules">Got it!</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- New Game Modal -->
+    <div id="modal-new-game" class="modal-backdrop hidden">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h2 class="modal-title">Start a New Game</h2>
+                <button class="btn-close" data-close-modal="modal-new-game">&times;</button>
+            </div>
+            <form id="form-new-game">
+                <div class="modal-body">
+                    <!-- Rule Variant Selection -->
+                    <div style="margin-bottom: 1.25rem;">
+                        <label style="display: block; font-weight: 700; margin-bottom: 0.5rem;">1. Select Rules Variant</label>
+                        <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                            <label style="display: flex; align-items: center; gap: 0.5rem; padding: 0.6rem; border: 1.5px solid #cbd5e1; border-radius: 8px; cursor: pointer;">
+                                <input type="radio" name="game-variant" value="classic" checked>
+                                <div>
+                                    <div style="font-weight: 700;">Classic Hearts</div>
+                                    <div style="font-size: 0.8rem; color: #64748b;">Standard 1-stage rotating pass (Left &rarr; Right &rarr; Across &rarr; Hold).</div>
+                                </div>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 0.5rem; padding: 0.6rem; border: 1.5px solid #cbd5e1; border-radius: 8px; cursor: pointer; background: #fffbeb; border-color: #f59e0b;">
+                                <input type="radio" name="game-variant" value="triple-pass">
+                                <div>
+                                    <div style="font-weight: 700; color: #92400e;">Triple Pass Hearts (3x Passing Mode) ⭐</div>
+                                    <div style="font-size: 0.8rem; color: #78350f;">3 sequential passes every round: Left &rarr; Front/Across &rarr; Right! You may pass cards you just received.</div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Player Setup Selection -->
+                    <div style="margin-bottom: 1.25rem;">
+                        <label style="display: block; font-weight: 700; margin-bottom: 0.5rem;">2. Select Player Setup</label>
+                        <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                            <label style="display: flex; align-items: center; gap: 0.5rem; padding: 0.6rem; border: 1.5px solid #cbd5e1; border-radius: 8px; cursor: pointer;">
+                                <input type="radio" name="game-mode" value="single-player" checked>
+                                <div>
+                                    <div style="font-weight: 700;">Single Player vs 3 AI Bots</div>
+                                    <div style="font-size: 0.8rem; color: #64748b;">Play against smart AI bots with full heuristics & Moon defense.</div>
+                                </div>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 0.5rem; padding: 0.6rem; border: 1.5px solid #cbd5e1; border-radius: 8px; cursor: pointer;">
+                                <input type="radio" name="game-mode" value="pass-and-play">
+                                <div>
+                                    <div style="font-weight: 700;">Pass & Play (Local Multiplayer)</div>
+                                    <div style="font-size: 0.8rem; color: #64748b;">Share this device with friends, with privacy hand shields!</div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div id="human-count-container" style="display: none; margin-bottom: 1.25rem;">
+                        <label style="display: block; font-weight: 700; margin-bottom: 0.35rem;">Number of Human Players</label>
+                        <select id="select-human-count" style="width: 100%; padding: 0.5rem; border-radius: 6px; border: 1px solid #cbd5e1;">
+                            <option value="2">2 Humans + 2 AI Bots</option>
+                            <option value="3">3 Humans + 1 AI Bot</option>
+                            <option value="4">4 Humans (Full Table)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="icon-btn btn-primary-action">Start Game</button>
+                    <button type="button" class="icon-btn" data-close-modal="modal-new-game">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Online Multiplayer Modal -->
+    <div id="modal-online" class="modal-backdrop hidden">
+        <div class="modal-dialog modal-online-dialog">
+            <div class="modal-header">
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <span style="font-size: 1.4rem;">🌐</span>
+                    <h2 class="modal-title">Online Multiplayer</h2>
+                </div>
+                <button class="btn-close" data-close-modal="modal-online">&times;</button>
+            </div>
+
+            <!-- Tab Navigation -->
+            <div class="online-tabs">
+                <button id="tab-btn-create" class="online-tab-btn active">Create Room</button>
+                <button id="tab-btn-join" class="online-tab-btn">Join Room</button>
+                <button id="tab-btn-lobby" class="online-tab-btn hidden">Room Lobby</button>
+            </div>
+
+            <div class="modal-body">
+                <!-- View 1: Create Room -->
+                <div id="view-create-room" class="online-view">
+                    <div class="form-group" style="margin-bottom: 1rem;">
+                        <label for="create-player-name" style="font-weight: 700; color: #334155; margin-bottom: 0.35rem; display: block;">Your Name</label>
+                        <input type="text" id="create-player-name" class="form-control" value="Player 1" maxlength="16" style="width: 100%; padding: 0.6rem; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 0.95rem;">
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 1rem;">
+                        <label for="create-room-code" style="font-weight: 700; color: #334155; margin-bottom: 0.35rem; display: block;">Room Code</label>
+                        <div class="input-with-action" style="display: flex; gap: 0.5rem;">
+                            <input type="text" id="create-room-code" class="form-control" value="HEARTS-7X9K" style="flex: 1; padding: 0.6rem; border-radius: 8px; border: 1px solid #cbd5e1; text-transform: uppercase; font-weight: 800; letter-spacing: 1.5px; font-size: 1rem; color: #0284c7;" maxlength="12">
+                            <button type="button" id="btn-random-code" class="icon-btn" title="Generate New Room Code" style="padding: 0.6rem 0.9rem; font-size: 1.1rem;">🎲</button>
+                        </div>
+                        <small style="color: #64748b; font-size: 0.8rem; margin-top: 0.25rem; display: block;">Your friend will use this code to connect</small>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 1rem;">
+                        <label for="create-room-password" style="font-weight: 700; color: #334155; margin-bottom: 0.35rem; display: block;">Room Password (Required)</label>
+                        <div class="input-with-action" style="display: flex; gap: 0.5rem;">
+                            <input type="password" id="create-room-password" class="form-control" value="1234" maxlength="16" style="flex: 1; padding: 0.6rem; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 0.95rem;">
+                            <button type="button" id="btn-toggle-create-pwd" class="icon-btn" title="Show/Hide Password" style="padding: 0.6rem 0.9rem;">👁️</button>
+                        </div>
+                        <small style="color: #64748b; font-size: 0.8rem; margin-top: 0.25rem; display: block;">Protects your room so only your invited friend can join</small>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 1rem;">
+                        <label for="create-game-mode" style="font-weight: 700; color: #334155; margin-bottom: 0.35rem; display: block;">Game Variant</label>
+                        <select id="create-game-mode" class="form-control" style="width: 100%; padding: 0.6rem; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 0.92rem;">
+                            <option value="classic">Classic Hearts (Standard Passing Cycle)</option>
+                            <option value="triple-pass">Triple Pass Hearts (3x Passing Stages per Round) ⭐</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 1.25rem;">
+                        <label style="display: flex; align-items: center; gap: 0.6rem; cursor: pointer; font-size: 0.9rem; color: #334155; font-weight: 600;">
+                            <input type="checkbox" id="create-fill-bots" checked style="width: 18px; height: 18px; accent-color: #2563eb;">
+                            <span>Fill remaining empty seats with smart AI bots</span>
+                        </label>
+                    </div>
+
+                    <div>
+                        <button type="button" id="btn-action-create" class="icon-btn btn-primary-action" style="width: 100%; justify-content: center; padding: 0.75rem; font-size: 1.05rem;">
+                            Create Room & Open Lobby
+                        </button>
+                    </div>
+
+                    <div style="margin-top: 1rem; padding: 0.65rem 0.85rem; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; font-size: 0.8rem; color: #166534; line-height: 1.4;">
+                        <strong>💡 Play online like a .io game:</strong> Want a live public website URL? Drag and drop this folder onto <a href="https://app.netlify.com/drop" target="_blank" style="color: #15803d; font-weight: 800; text-decoration: underline;">app.netlify.com/drop</a> for free instant hosting in 5 seconds!
+                    </div>
+                </div>
+
+                <!-- View 2: Join Room -->
+                <div id="view-join-room" class="online-view hidden">
+                    <div class="form-group" style="margin-bottom: 1rem;">
+                        <label for="join-player-name" style="font-weight: 700; color: #334155; margin-bottom: 0.35rem; display: block;">Your Name</label>
+                        <input type="text" id="join-player-name" class="form-control" value="Player 2" maxlength="16" style="width: 100%; padding: 0.6rem; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 0.95rem;">
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 1rem;">
+                        <label for="join-room-code" style="font-weight: 700; color: #334155; margin-bottom: 0.35rem; display: block;">Room Code</label>
+                        <input type="text" id="join-room-code" class="form-control" placeholder="e.g. HEARTS-7X9K" style="width: 100%; padding: 0.6rem; border-radius: 8px; border: 1px solid #cbd5e1; text-transform: uppercase; font-weight: 800; letter-spacing: 1.5px; font-size: 1rem; color: #0284c7;" maxlength="12">
+                        <small style="color: #64748b; font-size: 0.8rem; margin-top: 0.25rem; display: block;">Enter the room code shared by your friend</small>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 1.5rem;">
+                        <label for="join-room-password" style="font-weight: 700; color: #334155; margin-bottom: 0.35rem; display: block;">Room Password</label>
+                        <div class="input-with-action" style="display: flex; gap: 0.5rem;">
+                            <input type="password" id="join-room-password" class="form-control" placeholder="Enter room password" maxlength="16" style="flex: 1; padding: 0.6rem; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 0.95rem;">
+                            <button type="button" id="btn-toggle-join-pwd" class="icon-btn" title="Show/Hide Password" style="padding: 0.6rem 0.9rem;">👁️</button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <button type="button" id="btn-action-join" class="icon-btn btn-primary-action" style="width: 100%; justify-content: center; padding: 0.75rem; font-size: 1.05rem;">
+                            Connect & Join Room
+                        </button>
+                    </div>
+                </div>
+
+                <!-- View 3: Room Lobby -->
+                <div id="view-lobby" class="online-view hidden">
+                    <!-- Shareable Link Card -->
+                    <div class="lobby-share-card">
+                        <div class="share-card-header">
+                            <div>
+                                <div style="font-size: 0.72rem; text-transform: uppercase; color: #94a3b8; font-weight: 700;">Room Code</div>
+                                <div id="lobby-display-code" style="font-size: 1.5rem; font-weight: 900; color: #38bdf8; letter-spacing: 1.5px;">HEARTS-7X9K</div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="font-size: 0.72rem; text-transform: uppercase; color: #94a3b8; font-weight: 700;">Password</div>
+                                <div id="lobby-display-pwd" style="font-size: 1.2rem; font-weight: 800; color: #f59e0b;">••••</div>
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 0.75rem;">
+                            <div style="font-size: 0.82rem; font-weight: 700; margin-bottom: 0.35rem; color: #cbd5e1;">Direct Shareable Invite Link:</div>
+                            <div class="input-with-action" style="display: flex; gap: 0.5rem;">
+                                <input type="text" id="lobby-share-url" class="form-control" readonly style="flex: 1; font-size: 0.8rem; background: #0f172a; color: #93c5fd; border: 1px solid #334155; padding: 0.5rem; border-radius: 6px;">
+                                <button type="button" id="btn-copy-share-url" class="icon-btn btn-primary-action" style="white-space: nowrap; padding: 0.5rem 0.85rem;">
+                                    📋 Copy Link
+                                </button>
+                            </div>
+                            <div id="copy-feedback" class="copy-feedback hidden">✓ Invite link copied! Send it to your friend.</div>
+                        </div>
+                    </div>
+
+                    <!-- Player Seats Grid -->
+                    <h4 style="font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; margin: 1rem 0 0.5rem 0; font-weight: 700;">Table Seats (4 Players)</h4>
+                    <div id="lobby-seats-list" class="lobby-seats-grid"></div>
+
+                    <!-- Lobby Status & Chat Log -->
+                    <div id="lobby-status-banner" class="lobby-status-banner">
+                        Waiting for your friend to connect...
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer" id="online-modal-footer">
+                <button type="button" id="btn-lobby-start-game" class="icon-btn btn-primary-action hidden" style="font-size: 1rem; padding: 0.6rem 1.5rem;">
+                    🚀 Start Online Game
+                </button>
+                <button type="button" id="btn-leave-lobby" class="icon-btn hidden" style="color: #ef4444; border-color: rgba(239, 68, 68, 0.4);">
+                    Leave Room
+                </button>
+                <button type="button" class="icon-btn" data-close-modal="modal-online">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Shoot the Moon Fanfare Modal -->
+    <div id="modal-moon-shot" class="modal-backdrop hidden">
+        <div class="modal-dialog moon-shot-content">
+            <div class="moon-icon">🌕</div>
+            <h2 id="moon-shooter-name" style="font-size: 2rem; font-weight: 900; margin: 1rem 0 0.5rem 0;">You Shot the Moon!</h2>
+            <p style="font-size: 1.1rem; color: #fef08a;">All 26 points captured! 0 points to shooter, +26 points to all opponents!</p>
+            <div style="margin-top: 2rem;">
+                <button class="icon-btn btn-primary-action" data-close-modal="modal-moon-shot">Triumphant!</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Over Modal -->
+    <div id="modal-game-over" class="modal-backdrop hidden">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h2 class="modal-title" id="game-over-title">Game Over!</h2>
+            </div>
+            <div class="modal-body">
+                <p id="game-over-subtitle" style="font-size: 1.1rem; color: #475569; margin-bottom: 1rem; text-align: center; font-weight: 600;"></p>
+                <h4 style="font-weight: 700; margin-bottom: 0.5rem; color: #334155;">Final Standings</h4>
+                <ul id="game-over-standings" style="list-style: none;"></ul>
+            </div>
+            <div class="modal-footer">
+                <button id="btn-play-again" class="icon-btn btn-primary-action">Play Again</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pass-and-Play Privacy Curtain -->
+    <div id="privacy-curtain" class="privacy-curtain hidden">
+        <div style="font-size: 3rem; margin-bottom: 1rem;">🔒</div>
+        <h2 id="curtain-player-name" style="font-size: 2rem; font-weight: 800; color: #f8fafc; margin-bottom: 0.5rem;">Player 2</h2>
+        <p id="curtain-instruction" style="font-size: 1.1rem; color: #94a3b8; margin-bottom: 2rem;">Please pass the device. Tap below when ready to reveal your hand.</p>
+        <button id="btn-reveal-hand" class="icon-btn btn-primary-action" style="padding: 0.8rem 2rem; font-size: 1.1rem;">
+            Reveal Hand
+        </button>
+    </div>
+
+    <!-- Real-Time WebSocket Cloud Relay (Powers .io style multiplayer across any network) -->
+    <script src="https://unpkg.com/mqtt@5.3.5/dist/mqtt.min.js"></script>
+    <script>
+    if (typeof mqtt === 'undefined') {
+        document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.3.5/mqtt.min.js"><\/script>');
+    }
+    </script>
+
+    <!-- Scripts (Ordered cleanly so no CORS or bundling is required!) -->
+    <script src="js/audio.js"></script>
+    <script src="js/cards.js"></script>
+    <script src="js/rules.js"></script>
+    <script src="js/ai.js"></script>
+    <script src="js/stats.js"></script>
+    <script src="js/network.js"></script>
+    <script src="js/game.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
