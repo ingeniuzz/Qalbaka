@@ -1415,6 +1415,7 @@ html, body {
 
 
 
+
     <!-- Lucide icons or SVG equivalents -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2038,6 +2039,7 @@ html, body {
     </script>
 
     <!-- Scripts (Ordered cleanly so no CORS or bundling is required!) -->
+    
     
     
     
@@ -3750,7 +3752,8 @@ class HeartsNetwork {
         const pathname = window.location.pathname;
         const roomParam = encodeURIComponent(this.roomCode);
         const pwdParam = encodeURIComponent(this.roomPassword || '');
-        return `${origin}${pathname}?room=${roomParam}&pwd=${pwdParam}`;
+        const brokerParam = this.currentBrokerIndex || 0;
+        return `${origin}${pathname}?room=${roomParam}&pwd=${pwdParam}&b=${brokerParam}`;
     }
 
     /**
@@ -3763,7 +3766,13 @@ class HeartsNetwork {
         }
 
         if (this.client && this.client.connected) {
-            if (onConnectSuccess) onConnectSuccess();
+            if (this.roomTopic) {
+                this.client.subscribe(this.roomTopic, { qos: 1 }, () => {
+                    if (onConnectSuccess) onConnectSuccess();
+                });
+            } else {
+                if (onConnectSuccess) onConnectSuccess();
+            }
             return;
         }
 
@@ -3774,7 +3783,7 @@ class HeartsNetwork {
             this.client = mqtt.connect(brokerUrl, {
                 clientId: this.clientId,
                 clean: true,
-                connectTimeout: 7000,
+                connectTimeout: 8000,
                 reconnectPeriod: 2500
             });
         } catch (e) {
@@ -3786,9 +3795,13 @@ class HeartsNetwork {
         this.client.on('connect', () => {
             console.log(`Connected to cloud relay: ${brokerUrl}`);
             if (this.roomTopic) {
-                this.client.subscribe(this.roomTopic, { qos: 1 });
+                this.client.subscribe(this.roomTopic, { qos: 1 }, (err) => {
+                    if (err) console.error('Topic subscribe error:', err);
+                    if (onConnectSuccess) onConnectSuccess();
+                });
+            } else {
+                if (onConnectSuccess) onConnectSuccess();
             }
-            if (onConnectSuccess) onConnectSuccess();
         });
 
         this.client.on('message', (topic, message) => {
@@ -3802,11 +3815,11 @@ class HeartsNetwork {
 
         this.client.on('error', (err) => {
             console.warn('Cloud broker connection warning:', err);
-            this.tryNextBroker(onConnectSuccess);
+            // Do not switch brokers on transient error once connected; MQTT.js handles reconnection.
         });
 
         this.client.on('offline', () => {
-            console.log('Cloud broker offline, waiting or switching...');
+            console.log('Cloud broker offline, waiting for auto-reconnect...');
         });
     }
 
@@ -3907,8 +3920,9 @@ class HeartsNetwork {
         this.friendsCount = Math.max(1, Math.min(3, parseInt(count) || 1));
 
         for (let i = 1; i < 4; i++) {
-            // Preserve already connected human friends
-            if (this.lobbySeats[i] && this.lobbySeats[i].isHuman && this.lobbySeats[i].isConnected) {
+            // Preserve already connected human friends!
+            const isGuestConnected = Object.values(this.connectedGuests || {}).some(g => g.seatIndex === i);
+            if (isGuestConnected || (this.lobbySeats[i] && this.lobbySeats[i].isHuman && this.lobbySeats[i].isConnected)) {
                 continue;
             }
 
@@ -3924,11 +3938,11 @@ class HeartsNetwork {
             } else {
                 this.lobbySeats[i] = {
                     seatIndex: i,
-                    name: i === 2 ? 'Bot Oliver' : 'Bot Luna',
+                    name: i === 2 ? 'Bot Oliver' : (i === 3 ? 'Bot Luna' : 'Bot Milo'),
                     isHuman: false,
                     isConnected: true,
                     isBot: true,
-                    avatar: i === 2 ? '🦊' : '🦉'
+                    avatar: i === 2 ? '🦊' : (i === 3 ? '🦉' : '🤖')
                 };
             }
         }
@@ -3944,7 +3958,7 @@ class HeartsNetwork {
     // GUEST: JOIN ROOM
     // =========================================================================
 
-    joinRoom({ roomCode, password, playerName, avatar }) {
+    joinRoom({ roomCode, password, playerName, avatar, brokerIndex }) {
         this.leaveRoom();
 
         this.isHost = false;
@@ -3952,6 +3966,10 @@ class HeartsNetwork {
         this.roomPassword = (password || '').trim();
         this.myPlayerName = playerName || 'Guest';
         this.myAvatar = avatar || '🧑‍💻';
+
+        if (brokerIndex !== undefined && brokerIndex !== null) {
+            this.currentBrokerIndex = parseInt(brokerIndex) || 0;
+        }
 
         if (!this.roomCode) {
             if (this.onError) this.onError('Please enter a valid room code.');
@@ -3963,22 +3981,37 @@ class HeartsNetwork {
         if (this.onConnectionStatus) this.onConnectionStatus(`Connecting to room ${this.roomCode}...`);
 
         this.connectToCloudBroker(() => {
-            if (this.onConnectionStatus) this.onConnectionStatus(`Connected to cloud server! Requesting to join room ${this.roomCode}...`);
-            // Send join request to host
-            this.publish({
-                type: 'join_request',
-                roomCode: this.roomCode,
-                password: this.roomPassword,
-                playerName: this.myPlayerName,
-                avatar: this.myAvatar
-            });
+            if (this.onConnectionStatus) this.onConnectionStatus(`Connected! Sending join request to host...`);
 
-            // Set timeout in case room doesn't exist
-            this._joinTimeout = setTimeout(() => {
-                if (!this.isConnected) {
-                    if (this.onError) this.onError(`Room "${this.roomCode}" was not found or the host has not opened it yet. Please double check the code.`);
+            const sendJoin = () => {
+                if (this.isConnected) return;
+                this.publish({
+                    type: 'join_request',
+                    roomCode: this.roomCode,
+                    password: this.roomPassword,
+                    playerName: this.myPlayerName,
+                    avatar: this.myAvatar
+                });
+            };
+
+            // Send immediately upon connection and subscription confirmation
+            sendJoin();
+
+            // Resilient retry every 1.5s until join_accepted is received (up to 5 attempts = ~7.5s)
+            if (this._joinInterval) clearInterval(this._joinInterval);
+            let attempts = 0;
+            this._joinInterval = setInterval(() => {
+                attempts++;
+                if (this.isConnected || attempts >= 5) {
+                    clearInterval(this._joinInterval);
+                    this._joinInterval = null;
+                    if (!this.isConnected && this.onError) {
+                        this.onError(`Room "${this.roomCode}" was not found or the host has not opened it yet. Please double check the code.`);
+                    }
+                    return;
                 }
-            }, 8000);
+                sendJoin();
+            }, 1500);
         });
     }
 
@@ -4028,6 +4061,10 @@ class HeartsNetwork {
         // -----------------------------------------------------
         if (!this.isHost) {
             if (data.type === 'join_accepted' && data.targetId === this.clientId) {
+                if (this._joinInterval) {
+                    clearInterval(this._joinInterval);
+                    this._joinInterval = null;
+                }
                 clearTimeout(this._joinTimeout);
                 this.isConnected = true;
                 this.mySeatIndex = data.seatIndex;
@@ -4039,6 +4076,10 @@ class HeartsNetwork {
                 if (window.soundEngine) window.soundEngine.playCardSnap();
                 return;
             } else if (data.type === 'join_rejected' && data.targetId === this.clientId) {
+                if (this._joinInterval) {
+                    clearInterval(this._joinInterval);
+                    this._joinInterval = null;
+                }
                 clearTimeout(this._joinTimeout);
                 if (this.onError) this.onError(data.reason || 'Failed to join room.');
                 this.leaveRoom();
@@ -4107,6 +4148,21 @@ class HeartsNetwork {
                 type: 'join_rejected',
                 targetId: data.senderId,
                 reason: 'Incorrect room password. Please verify the password and try again.'
+            });
+            return;
+        }
+
+        // Check if guest is already seated (e.g. from an automatic retry handshake)
+        if (this.connectedGuests[data.senderId]) {
+            const existingSeat = this.connectedGuests[data.senderId].seatIndex;
+            this.publish({
+                type: 'join_accepted',
+                targetId: data.senderId,
+                seatIndex: existingSeat,
+                roomCode: this.roomCode,
+                hostName: this.myPlayerName,
+                gameMode: this.gameMode,
+                lobbySeats: this.lobbySeats
             });
             return;
         }
@@ -4285,6 +4341,15 @@ class HeartsNetwork {
     }
 
     leaveRoom() {
+        if (this._joinInterval) {
+            clearInterval(this._joinInterval);
+            this._joinInterval = null;
+        }
+        if (this._joinTimeout) {
+            clearTimeout(this._joinTimeout);
+            this._joinTimeout = null;
+        }
+
         if (this.client && this.client.connected && this.roomTopic) {
             if (!this.isHost) {
                 this.publish({ type: 'guest_leave' });
@@ -4325,11 +4390,12 @@ class HeartsGame {
     };
 
     constructor(options = {}) {
-        this.settings = StatsManager.loadSettings();
+        this.settings = { ...StatsManager.loadSettings(), ...(options.settings || {}) };
         this.gameMode = options.gameMode || HeartsRules.GAME_MODES.CLASSIC;
         this.playerCount = 4;
         this.humanSeats = options.humanSeats || [0]; // default: Player 0 (South) is Human
         this.playerNames = options.playerNames || ['You', 'West Bot', 'North Bot', 'East Bot'];
+        this.playerAvatars = options.playerAvatars || ['🧑‍💼', '🤖', '🦊', '🦉'];
         
         this.players = [];
         this.roundNumber = 1;
@@ -4361,14 +4427,14 @@ class HeartsGame {
 
     initPlayers() {
         this.players = [];
-        const avatars = ['🧑‍💼', '🤖', '🦊', '🦉'];
+        const avatars = this.playerAvatars || ['🧑‍💼', '🤖', '🦊', '🦉'];
         for (let i = 0; i < 4; i++) {
             const isHuman = this.humanSeats.includes(i);
             this.players.push({
                 index: i,
                 name: this.playerNames[i] || (isHuman ? `Player ${i + 1}` : `Bot ${i + 1}`),
                 isHuman: isHuman,
-                avatar: avatars[i],
+                avatar: avatars[i] || '🧑‍💻',
                 hand: [],
                 passedCards: [],
                 receivedCards: [],
@@ -5986,6 +6052,7 @@ class TableUI {
             const name = document.getElementById('join-player-name')?.value.trim() || 'Guest';
             const code = document.getElementById('join-room-code')?.value.trim();
             const pwd = document.getElementById('join-room-password')?.value.trim();
+            const btnJoin = document.getElementById('btn-action-join');
 
             if (!code) {
                 this.showToast('Please enter the room code.');
@@ -5996,13 +6063,17 @@ class TableUI {
                 return;
             }
 
+            if (btnJoin) {
+                btnJoin.disabled = true;
+                btnJoin.textContent = 'Connecting & Joining...';
+            }
+
             window.heartsNetwork.joinRoom({
                 roomCode: code,
                 password: pwd,
-                playerName: name
+                playerName: name,
+                brokerIndex: window.heartsNetwork._pendingBrokerIndex
             });
-
-            this.showOnlineModal({ tab: 'lobby' });
         });
 
         // Copy Share URL
@@ -6040,21 +6111,59 @@ class TableUI {
         document.getElementById('btn-lobby-start-game')?.addEventListener('click', () => {
             if (!window.heartsNetwork.isHost) return;
 
+            const connectedGuestsList = Object.values(window.heartsNetwork.connectedGuests || {});
+
+            if (connectedGuestsList.length === 0) {
+                const proceed = confirm('No friends have connected to the room yet! If you start now, empty seats will be filled with AI bots. Do you want to start with AI bots?');
+                if (!proceed) return;
+            }
+
             const seats = window.heartsNetwork.lobbySeats;
 
-            // Any human seat that is waiting for a friend but no one connected is filled with a smart AI bot!
+            const humanSeats = [0];
+            const playerNames = [
+                window.heartsNetwork.myPlayerName || 'Host',
+                'Bot Oliver',
+                'Bot Luna',
+                'Bot Milo'
+            ];
+            const playerAvatars = [
+                window.heartsNetwork.myAvatar || '🧑‍💼',
+                '🦊',
+                '🦉',
+                '🤖'
+            ];
+
+            // 1. Mark connected guests - Guaranteed to NEVER be overwritten by bots
+            connectedGuestsList.forEach(guest => {
+                const s = guest.seatIndex;
+                if (s >= 1 && s <= 3) {
+                    humanSeats.push(s);
+                    playerNames[s] = guest.name;
+                    playerAvatars[s] = guest.avatar || '🧑‍💻';
+                    if (seats[s]) {
+                        seats[s].isHuman = true;
+                        seats[s].isConnected = true;
+                        seats[s].isBot = false;
+                        seats[s].name = guest.name;
+                        seats[s].avatar = guest.avatar;
+                    }
+                }
+            });
+
+            // 2. Mark remaining unoccupied seats as AI bots
             for (let i = 1; i < 4; i++) {
-                if (seats[i].isHuman && !seats[i].isConnected) {
-                    seats[i].isHuman = false;
-                    seats[i].isBot = true;
-                    seats[i].name = i === 1 ? 'Bot Oliver' : (i === 2 ? 'Bot Luna' : 'Bot Milo');
-                    seats[i].avatar = i === 1 ? '🦊' : (i === 2 ? '🦉' : '🤖');
+                if (!humanSeats.includes(i)) {
+                    if (seats[i]) {
+                        seats[i].isHuman = false;
+                        seats[i].isBot = true;
+                        seats[i].isConnected = true;
+                        seats[i].name = playerNames[i];
+                        seats[i].avatar = playerAvatars[i];
+                    }
                 }
             }
 
-            const humanSeats = seats.filter(s => s.isHuman && s.isConnected).map(s => s.seatIndex);
-            const playerNames = seats.map(s => s.name);
-            const playerAvatars = seats.map(s => s.avatar);
             const gameMode = window.heartsNetwork.gameMode;
 
             // Initialize game on Host with passAndPlayPrivacy: false
@@ -6062,6 +6171,7 @@ class TableUI {
                 gameMode,
                 humanSeats,
                 playerNames,
+                playerAvatars,
                 settings: {
                     ...StatsManager.loadSettings(),
                     passAndPlayPrivacy: false
@@ -6085,7 +6195,10 @@ class TableUI {
                 playerAvatars
             });
 
-            onlineGame.startNewGame();
+            // Delay dealing slightly (250ms) to ensure game_start arrives at all devices first
+            setTimeout(() => {
+                onlineGame.startNewGame();
+            }, 250);
         });
 
         // Leave Lobby Action
@@ -6133,6 +6246,17 @@ class TableUI {
         if (!net) return;
 
         net.onLobbyUpdated = (lobbySeats, roomCode, password) => {
+            const btnJoin = document.getElementById('btn-action-join');
+            if (btnJoin) {
+                btnJoin.disabled = false;
+                btnJoin.textContent = 'Join Room';
+            }
+
+            // If we are guest and successfully connected, switch to lobby tab!
+            if (!net.isHost && net.isConnected) {
+                this.showOnlineModal({ tab: 'lobby' });
+            }
+
             this.renderLobbySeats(lobbySeats);
             const codeEl = document.getElementById('lobby-display-code');
             const pwdEl = document.getElementById('lobby-display-pwd');
@@ -6147,7 +6271,21 @@ class TableUI {
             if (btnLeave) btnLeave.classList.remove('hidden');
 
             if (net.isHost) {
-                if (btnStart) btnStart.classList.remove('hidden');
+                if (btnStart) {
+                    btnStart.classList.remove('hidden');
+                    const connectedGuestsList = Object.values(net.connectedGuests || {});
+                    if (connectedGuestsList.length === 0) {
+                        btnStart.textContent = 'Start Game (Waiting for friends... or play with bots)';
+                        btnStart.style.background = 'linear-gradient(135deg, #f59e0b, #d97706)';
+                    } else {
+                        const guestNames = connectedGuestsList.map(g => g.name).join(', ');
+                        const totalHumans = 1 + connectedGuestsList.length;
+                        const botCount = 4 - totalHumans;
+                        const botStr = botCount > 0 ? ` + ${botCount} Bot${botCount > 1 ? 's' : ''}` : '';
+                        btnStart.textContent = `Start Game (You + ${guestNames}${botStr}) ▶`;
+                        btnStart.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+                    }
+                }
             } else {
                 if (btnStart) btnStart.classList.add('hidden');
             }
@@ -6169,6 +6307,11 @@ class TableUI {
         };
 
         net.onError = (err) => {
+            const btnJoin = document.getElementById('btn-action-join');
+            if (btnJoin) {
+                btnJoin.disabled = false;
+                btnJoin.textContent = 'Join Room';
+            }
             const statusEl = document.getElementById('lobby-status-banner');
             if (statusEl) statusEl.textContent = `Error: ${err}`;
             this.showToast(`⚠️ ${err}`, 5000);
@@ -6204,6 +6347,17 @@ class TableUI {
         };
 
         net.onRoundDealt = (data) => {
+            this.onlineIsGuest = true;
+            if (this.modalOnline) this.modalOnline.classList.add('hidden');
+            if (this.onlineHudEl) {
+                this.onlineHudEl.classList.remove('hidden');
+                if (this.hudRoomCodeEl) this.hudRoomCodeEl.textContent = `Room: ${net.roomCode} (Guest)`;
+            }
+            if (data.playerNames) this.onlinePlayerNames = data.playerNames;
+            if (this.currentViewingPlayerIndex !== net.mySeatIndex) {
+                this.setViewingPlayer(net.mySeatIndex);
+            }
+
             this.onlineGuestHand = data.myHand.map(c => new Card(c.suit, c.rank));
             this.onlinePassDirection = data.passDirection;
             this.onlinePassStage = data.passStage;
@@ -6585,6 +6739,14 @@ class TableUI {
             const urlParams = new URLSearchParams(window.location.search);
             const roomParam = urlParams.get('room');
             const pwdParam = urlParams.get('pwd');
+            const brokerParam = urlParams.get('b');
+
+            if (brokerParam !== null && window.heartsNetwork) {
+                const bIdx = parseInt(brokerParam) || 0;
+                window.heartsNetwork._pendingBrokerIndex = bIdx;
+                window.heartsNetwork.currentBrokerIndex = bIdx;
+            }
+
             if (roomParam) {
                 setTimeout(() => {
                     this.showOnlineModal({
