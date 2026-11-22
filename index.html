@@ -1414,6 +1414,7 @@ html, body {
     </style>
 
 
+
     <!-- Lucide icons or SVG equivalents -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1873,6 +1874,16 @@ html, body {
                         </select>
                     </div>
 
+                    <div class="form-group" style="margin-bottom: 1rem;">
+                        <label for="create-friends-count" style="font-weight: 700; color: #334155; margin-bottom: 0.35rem; display: block;">👥 Friends to Invite</label>
+                        <select id="create-friends-count" class="form-control" style="width: 100%; padding: 0.6rem; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 0.95rem; font-weight: 600; background: #fff;">
+                            <option value="1">1 Friend (You + 1 Friend + 2 AI Bots)</option>
+                            <option value="2">2 Friends (You + 2 Friends + 1 AI Bot)</option>
+                            <option value="3">3 Friends (You + 3 Friends - 4 Real Humans!)</option>
+                        </select>
+                        <small style="color: #64748b; font-size: 0.8rem; margin-top: 0.25rem; display: block;">Choose how many friends join; remaining seats are filled with smart AI bots</small>
+                    </div>
+
                     <div class="form-group" style="margin-bottom: 1.25rem;">
                         <label style="display: flex; align-items: center; gap: 0.6rem; cursor: pointer; font-size: 0.9rem; color: #334155; font-weight: 600;">
                             <input type="checkbox" id="create-fill-bots" checked style="width: 18px; height: 18px; accent-color: #2563eb;">
@@ -1947,7 +1958,17 @@ html, body {
                     </div>
 
                     <!-- Player Seats Grid -->
-                    <h4 style="font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; margin: 1rem 0 0.5rem 0; font-weight: 700;">Table Seats (4 Players)</h4>
+                    <div id="host-lobby-seat-controls" style="display: flex; justify-content: space-between; align-items: center; margin: 1rem 0 0.5rem 0;">
+                        <h4 style="font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; font-weight: 700; margin: 0;">Table Seats (4 Players)</h4>
+                        <div style="display: flex; align-items: center; gap: 0.35rem; font-size: 0.78rem; color: #475569;">
+                            <span>Friends:</span>
+                            <select id="lobby-friends-count" style="padding: 2px 6px; font-size: 0.78rem; border-radius: 4px; border: 1px solid #cbd5e1; font-weight: 600; background: #fff;">
+                                <option value="1">1 Friend (+ 2 Bots)</option>
+                                <option value="2">2 Friends (+ 1 Bot)</option>
+                                <option value="3">3 Friends (No Bots)</option>
+                            </select>
+                        </div>
+                    </div>
                     <div id="lobby-seats-list" class="lobby-seats-grid"></div>
 
                     <!-- Lobby Status & Chat Log -->
@@ -2017,6 +2038,7 @@ html, body {
     </script>
 
     <!-- Scripts (Ordered cleanly so no CORS or bundling is required!) -->
+    
     
     
     <script>
@@ -3825,7 +3847,7 @@ class HeartsNetwork {
     // HOST: CREATE ROOM
     // =========================================================================
 
-    createRoom({ roomCode, password, hostName, avatar, gameMode = 'classic' }) {
+    createRoom({ roomCode, password, hostName, avatar, gameMode = 'classic', friendsCount = 1 }) {
         this.leaveRoom();
 
         this.isHost = true;
@@ -3835,16 +3857,36 @@ class HeartsNetwork {
         this.myAvatar = avatar || '🧑‍💼';
         this.mySeatIndex = 0;
         this.gameMode = gameMode;
+        this.friendsCount = Math.max(1, Math.min(3, parseInt(friendsCount) || 1));
         this.connectedGuests = {};
 
         this.roomTopic = `agy-hearts-v2/room/${HeartsNetwork.formatRoomCode(this.roomCode)}`;
 
         this.lobbySeats = [
-            { seatIndex: 0, name: this.myPlayerName, isHuman: true, isConnected: true, isBot: false, avatar: this.myAvatar },
-            { seatIndex: 1, name: 'Waiting for friend...', isHuman: true, isConnected: false, isBot: false, avatar: '🧑‍💻' },
-            { seatIndex: 2, name: 'Bot Oliver', isHuman: false, isConnected: true, isBot: true, avatar: '🦊' },
-            { seatIndex: 3, name: 'Bot Luna', isHuman: false, isConnected: true, isBot: true, avatar: '🦉' }
+            { seatIndex: 0, name: this.myPlayerName, isHuman: true, isConnected: true, isBot: false, avatar: this.myAvatar }
         ];
+
+        for (let i = 1; i < 4; i++) {
+            if (i <= this.friendsCount) {
+                this.lobbySeats.push({
+                    seatIndex: i,
+                    name: i === 1 ? 'Waiting for friend...' : `Waiting for friend ${i}...`,
+                    isHuman: true,
+                    isConnected: false,
+                    isBot: false,
+                    avatar: i === 1 ? '🧑‍💻' : (i === 2 ? '👩‍💻' : '🧑‍🚀')
+                });
+            } else {
+                this.lobbySeats.push({
+                    seatIndex: i,
+                    name: i === 2 ? 'Bot Oliver' : 'Bot Luna',
+                    isHuman: false,
+                    isConnected: true,
+                    isBot: true,
+                    avatar: i === 2 ? '🦊' : '🦉'
+                });
+            }
+        }
 
         this.connectToCloudBroker(() => {
             this.isConnected = true;
@@ -3857,6 +3899,44 @@ class HeartsNetwork {
                 hostName: this.myPlayerName,
                 hasPassword: !!this.roomPassword
             });
+        });
+    }
+
+    setFriendsCount(count) {
+        if (!this.isHost || this.isInGame) return;
+        this.friendsCount = Math.max(1, Math.min(3, parseInt(count) || 1));
+
+        for (let i = 1; i < 4; i++) {
+            // Preserve already connected human friends
+            if (this.lobbySeats[i] && this.lobbySeats[i].isHuman && this.lobbySeats[i].isConnected) {
+                continue;
+            }
+
+            if (i <= this.friendsCount) {
+                this.lobbySeats[i] = {
+                    seatIndex: i,
+                    name: i === 1 ? 'Waiting for friend...' : `Waiting for friend ${i}...`,
+                    isHuman: true,
+                    isConnected: false,
+                    isBot: false,
+                    avatar: i === 1 ? '🧑‍💻' : (i === 2 ? '👩‍💻' : '🧑‍🚀')
+                };
+            } else {
+                this.lobbySeats[i] = {
+                    seatIndex: i,
+                    name: i === 2 ? 'Bot Oliver' : 'Bot Luna',
+                    isHuman: false,
+                    isConnected: true,
+                    isBot: true,
+                    avatar: i === 2 ? '🦊' : '🦉'
+                };
+            }
+        }
+
+        if (this.onLobbyUpdated) this.onLobbyUpdated(this.lobbySeats, this.roomCode, this.roomPassword);
+        this.publish({
+            type: 'lobby_update',
+            lobbySeats: this.lobbySeats
         });
     }
 
@@ -4157,6 +4237,10 @@ class HeartsNetwork {
             ...data,
             targetSeat: seatIndex
         });
+    }
+
+    getConnectedGuestSeats() {
+        return Object.values(this.connectedGuests || {}).map(g => g.seatIndex);
     }
 
     sendToHost(data) {
@@ -4895,6 +4979,9 @@ class TableUI {
             if (this.game && this.game.players && this.game.players[HeartsGame.POSITIONS.SOUTH]) {
                 this.renderPlayerHand(HeartsGame.POSITIONS.SOUTH);
             }
+            if (this.onlineIsGuest && this.onlineGuestHand) {
+                this.renderOnlineGuestHand();
+            }
         });
 
         // Settings change handlers
@@ -4980,20 +5067,23 @@ class TableUI {
             if (event === 'dealing') {
                 // Host sends each connected guest their private hand
                 if (window.heartsNetwork && window.heartsNetwork.isHost && window.heartsNetwork.isConnected) {
-                    for (const [seatStr, conn] of Object.entries(window.heartsNetwork.guestConnections)) {
-                        const seat = parseInt(seatStr);
-                        const guestHand = this.game.players[seat].hand.map(c => ({ suit: c.suit, rank: c.rank, id: c.id }));
-                        window.heartsNetwork.sendToGuest(seat, {
-                            type: 'round_dealt',
-                            myHand: guestHand,
-                            passDirection: this.game.passDirection,
-                            passStage: this.game.passStage,
-                            gameMode: this.game.gameMode,
-                            roundNumber: this.game.roundNumber,
-                            scores: this.game.players.map(p => p.totalScore),
-                            playerNames: this.game.players.map(p => p.name)
-                        });
-                    }
+                    const guests = Object.values(window.heartsNetwork.connectedGuests || {});
+                    guests.forEach(guest => {
+                        const seat = guest.seatIndex;
+                        if (this.game && this.game.players && this.game.players[seat]) {
+                            const guestHand = this.game.players[seat].hand.map(c => ({ suit: c.suit, rank: c.rank, id: c.id }));
+                            window.heartsNetwork.sendToGuest(seat, {
+                                type: 'round_dealt',
+                                myHand: guestHand,
+                                passDirection: this.game.passDirection,
+                                passStage: this.game.passStage,
+                                gameMode: this.game.gameMode,
+                                roundNumber: this.game.roundNumber,
+                                scores: this.game.players.map(p => p.totalScore),
+                                playerNames: this.game.players.map(p => p.name)
+                            });
+                        }
+                    });
                 }
             } else if (event === 'turn_start' && this.game.currentPhase === HeartsGame.PHASES.PLAYING) {
                 // Host broadcasts turn update
@@ -5008,7 +5098,7 @@ class TableUI {
                 }
 
                 const activePlayer = this.game.players[this.game.activePlayerIndex];
-                if (activePlayer.isHuman && this.game.humanSeats.length > 1 && this.currentViewingPlayerIndex !== activePlayer.index) {
+                if (!window.heartsNetwork?.isConnected && activePlayer.isHuman && this.game.humanSeats.length > 1 && this.currentViewingPlayerIndex !== activePlayer.index) {
                     this.currentViewingPlayerIndex = activePlayer.index;
                     if (this.game.settings.passAndPlayPrivacy) {
                         this.showPrivacyCurtainFor(activePlayer, "It's your turn to play!");
@@ -5022,18 +5112,21 @@ class TableUI {
 
                 // Host sends updated hand and received cards to guests
                 if (window.heartsNetwork && window.heartsNetwork.isHost && window.heartsNetwork.isConnected) {
-                    for (const [seatStr, conn] of Object.entries(window.heartsNetwork.guestConnections)) {
-                        const seat = parseInt(seatStr);
-                        const guestHand = this.game.players[seat].hand.map(c => ({ suit: c.suit, rank: c.rank, id: c.id }));
-                        const received = (this.game.players[seat].receivedCards || []).map(c => ({ suit: c.suit, rank: c.rank, id: c.id }));
-                        window.heartsNetwork.sendToGuest(seat, {
-                            type: 'pass_exchanged',
-                            myHand: guestHand,
-                            receivedCards: received,
-                            passStage: this.game.passStage,
-                            nextPhase: this.game.currentPhase
-                        });
-                    }
+                    const guests = Object.values(window.heartsNetwork.connectedGuests || {});
+                    guests.forEach(guest => {
+                        const seat = guest.seatIndex;
+                        if (this.game && this.game.players && this.game.players[seat]) {
+                            const guestHand = this.game.players[seat].hand.map(c => ({ suit: c.suit, rank: c.rank, id: c.id }));
+                            const received = (this.game.players[seat].receivedCards || []).map(c => ({ suit: c.suit, rank: c.rank, id: c.id }));
+                            window.heartsNetwork.sendToGuest(seat, {
+                                type: 'pass_exchanged',
+                                myHand: guestHand,
+                                receivedCards: received,
+                                passStage: this.game.passStage,
+                                nextPhase: this.game.currentPhase
+                            });
+                        }
+                    });
                 }
             } else if (event === 'passed') {
                 this.selectedPassCardIds.clear();
@@ -5041,18 +5134,21 @@ class TableUI {
 
                 // Host sends final exchanged hands to guests
                 if (window.heartsNetwork && window.heartsNetwork.isHost && window.heartsNetwork.isConnected) {
-                    for (const [seatStr, conn] of Object.entries(window.heartsNetwork.guestConnections)) {
-                        const seat = parseInt(seatStr);
-                        const guestHand = this.game.players[seat].hand.map(c => ({ suit: c.suit, rank: c.rank, id: c.id }));
-                        const received = (this.game.players[seat].receivedCards || []).map(c => ({ suit: c.suit, rank: c.rank, id: c.id }));
-                        window.heartsNetwork.sendToGuest(seat, {
-                            type: 'pass_exchanged',
-                            myHand: guestHand,
-                            receivedCards: received,
-                            passStage: this.game.passStage,
-                            nextPhase: this.game.currentPhase
-                        });
-                    }
+                    const guests = Object.values(window.heartsNetwork.connectedGuests || {});
+                    guests.forEach(guest => {
+                        const seat = guest.seatIndex;
+                        if (this.game && this.game.players && this.game.players[seat]) {
+                            const guestHand = this.game.players[seat].hand.map(c => ({ suit: c.suit, rank: c.rank, id: c.id }));
+                            const received = (this.game.players[seat].receivedCards || []).map(c => ({ suit: c.suit, rank: c.rank, id: c.id }));
+                            window.heartsNetwork.sendToGuest(seat, {
+                                type: 'pass_exchanged',
+                                myHand: guestHand,
+                                receivedCards: received,
+                                passStage: this.game.passStage,
+                                nextPhase: this.game.currentPhase
+                            });
+                        }
+                    });
                 }
             }
             this.renderAll();
@@ -5150,6 +5246,10 @@ class TableUI {
         };
 
         game.onPassStepPrompt = (pendingHuman) => {
+            if (window.heartsNetwork && window.heartsNetwork.isConnected) {
+                // In online multiplayer, each player plays on their own device!
+                return;
+            }
             this.currentViewingPlayerIndex = pendingHuman.index;
             const stageText = this.game.gameMode === HeartsRules.GAME_MODES.TRIPLE_PASS
                 ? `Triple Pass (Stage ${this.game.passStage}/3): Pick 3 cards`
@@ -5863,6 +5963,7 @@ class TableUI {
             const code = document.getElementById('create-room-code')?.value.trim() || HeartsNetwork.generateRoomCode();
             const pwd = document.getElementById('create-room-password')?.value.trim();
             const mode = document.getElementById('create-game-mode')?.value || 'classic';
+            const friends = parseInt(document.getElementById('create-friends-count')?.value || '1');
 
             if (!pwd) {
                 this.showToast('Please specify a room password to protect your room.');
@@ -5873,7 +5974,8 @@ class TableUI {
                 roomCode: code,
                 password: pwd,
                 hostName: name,
-                gameMode: mode
+                gameMode: mode,
+                friendsCount: friends
             });
 
             this.showOnlineModal({ tab: 'lobby' });
@@ -5927,21 +6029,43 @@ class TableUI {
         document.getElementById('btn-copy-share-url')?.addEventListener('click', copyHandler);
         this.btnHudCopy?.addEventListener('click', copyHandler);
 
+        // Host dynamically changes friends count in lobby
+        document.getElementById('lobby-friends-count')?.addEventListener('change', (e) => {
+            if (window.heartsNetwork && window.heartsNetwork.isHost) {
+                window.heartsNetwork.setFriendsCount(e.target.value);
+            }
+        });
+
         // Start Online Game (Host only)
         document.getElementById('btn-lobby-start-game')?.addEventListener('click', () => {
             if (!window.heartsNetwork.isHost) return;
 
             const seats = window.heartsNetwork.lobbySeats;
+
+            // Any human seat that is waiting for a friend but no one connected is filled with a smart AI bot!
+            for (let i = 1; i < 4; i++) {
+                if (seats[i].isHuman && !seats[i].isConnected) {
+                    seats[i].isHuman = false;
+                    seats[i].isBot = true;
+                    seats[i].name = i === 1 ? 'Bot Oliver' : (i === 2 ? 'Bot Luna' : 'Bot Milo');
+                    seats[i].avatar = i === 1 ? '🦊' : (i === 2 ? '🦉' : '🤖');
+                }
+            }
+
             const humanSeats = seats.filter(s => s.isHuman && s.isConnected).map(s => s.seatIndex);
             const playerNames = seats.map(s => s.name);
             const playerAvatars = seats.map(s => s.avatar);
             const gameMode = window.heartsNetwork.gameMode;
 
-            // Initialize game on Host
+            // Initialize game on Host with passAndPlayPrivacy: false
             const onlineGame = new HeartsGame({
                 gameMode,
                 humanSeats,
-                playerNames
+                playerNames,
+                settings: {
+                    ...StatsManager.loadSettings(),
+                    passAndPlayPrivacy: false
+                }
             });
 
             this.bindGame(onlineGame);
@@ -6026,6 +6150,15 @@ class TableUI {
                 if (btnStart) btnStart.classList.remove('hidden');
             } else {
                 if (btnStart) btnStart.classList.add('hidden');
+            }
+
+            const friendsSelect = document.getElementById('lobby-friends-count');
+            const seatControls = document.getElementById('host-lobby-seat-controls');
+            if (seatControls) {
+                seatControls.style.display = net.isHost ? 'flex' : 'none';
+            }
+            if (friendsSelect && net.isHost) {
+                friendsSelect.value = String(net.friendsCount || 1);
             }
         };
 
@@ -6320,6 +6453,31 @@ class TableUI {
 
             handContainer.appendChild(cardEl);
         });
+
+        // Dynamic mobile card overlap calculation for online guest hand
+        const cardCount = this.onlineGuestHand.length;
+        const isMobile = window.innerWidth <= 640;
+        if (isMobile && cardCount > 0) {
+            const availableWidth = Math.min(window.innerWidth - 12, 460);
+            const cardWidth = Math.min(Math.max(window.innerWidth * 0.13, 44), 54);
+            const cardHeight = Math.round(cardWidth * 1.42);
+
+            let overlap = -24;
+            if (cardCount > 1) {
+                const step = Math.min((availableWidth - cardWidth) / (cardCount - 1), cardWidth * 0.72);
+                overlap = -(cardWidth - step);
+            }
+
+            handContainer.querySelectorAll('.card-wrapper').forEach((el, i) => {
+                el.style.width = `${Math.round(cardWidth)}px`;
+                el.style.height = `${cardHeight}px`;
+                if (i > 0) {
+                    el.style.marginLeft = `${Math.round(overlap)}px`;
+                } else {
+                    el.style.marginLeft = '0px';
+                }
+            });
+        }
     }
 
     renderOnlineStationCardCounts(count) {
