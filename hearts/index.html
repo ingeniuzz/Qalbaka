@@ -1667,7 +1667,59 @@ html, body {
     }
 }
 
-    </style>
+    
+/* ===================== MAIN MENU SCREEN ===================== */
+#screen-main-hearts {
+    position: fixed; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    background: radial-gradient(ellipse at 50% 0%, rgba(240,165,0,0.08) 0%, transparent 60%),
+                linear-gradient(180deg, #122b1e 0%, #1a3a2a 50%, #0f2318 100%);
+    z-index: 9999;
+    padding: 24px 16px;
+    gap: 10px;
+}
+#screen-main-hearts .main-logo { text-align: center; margin-bottom: 24px; }
+#screen-main-hearts .suit-row {
+    font-size: 2rem; letter-spacing: 10px; color: #9abba7;
+}
+#screen-main-hearts .suit-row .red { color: #e53935; }
+#screen-main-hearts .game-title {
+    font-size: 3rem; font-weight: 900; color: #f0a500;
+    text-shadow: 0 0 24px rgba(240,165,0,0.4);
+    letter-spacing: 3px; text-transform: uppercase;
+    margin-top: 6px;
+}
+#screen-main-hearts .game-subtitle {
+    font-size: 0.9rem; color: #9abba7; margin-top: 4px;
+    font-style: italic; letter-spacing: 1px;
+}
+#screen-main-hearts .menu-buttons {
+    display: flex; flex-direction: column; gap: 12px;
+    width: 100%; max-width: 320px;
+}
+#screen-main-hearts .btn-menu-main {
+    display: flex; align-items: center; justify-content: center;
+    gap: 8px; padding: 14px 20px;
+    border-radius: 12px; border: 2px solid rgba(240,165,0,0.3);
+    font-size: 1.05rem; font-weight: 700;
+    cursor: pointer; transition: all 0.15s;
+    text-decoration: none; color: #f8fafc;
+}
+#screen-main-hearts .btn-menu-main.primary {
+    background: #f0a500; color: #1a1a1a; border-color: #f0a500;
+    font-size: 1.15rem;
+}
+#screen-main-hearts .btn-menu-main.primary:hover { background: #ffd166; }
+#screen-main-hearts .btn-menu-main.online {
+    background: rgba(34,197,94,0.15); border-color: rgba(34,197,94,0.4); color: #4ade80;
+}
+#screen-main-hearts .btn-menu-main.online:hover { background: rgba(34,197,94,0.25); }
+#screen-main-hearts .btn-menu-main.secondary {
+    background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.15); color: #d1d5db;
+}
+#screen-main-hearts .btn-menu-main.secondary:hover { background: rgba(255,255,255,0.12); }
+</style>
 
 
 
@@ -1687,7 +1739,21 @@ html, body {
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div id="app">
+<div id="screen-main-hearts">
+    <div class="main-logo">
+        <div class="suit-row"><span class="red">&#9829;</span> &#9824; <span class="red">&#9830;</span> &#9827;</div>
+        <div class="game-title">QALBAKA</div>
+        <div class="game-subtitle">Hearts Card Game</div>
+    </div>
+    <div class="menu-buttons">
+        <button id="hearts-btn-new-game" class="btn-menu-main primary" onclick="document.getElementById('screen-main-hearts').style.display='none'; document.getElementById('app').style.display='flex';">&#127183; New Game</button>
+        <button id="hearts-btn-online" class="btn-menu-main online">&#127760; Online with Friends</button>
+        <button id="hearts-btn-rules" class="btn-menu-main secondary">&#128214; Rules</button>
+        <button id="hearts-btn-settings" class="btn-menu-main secondary">&#9881; Settings</button>
+        <a href="../" class="btn-menu-main secondary">&#8592; Back to Games</a>
+    </div>
+</div>
+    <div id="app" style="display:none">
         <!-- Header Nav -->
         <header class="game-header">
             <div class="header-left">
@@ -7485,7 +7551,33 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     ui.bindGame(initialGame);
-    initialGame.startNewGame();
+    // Game starts from menu button
+    window._heartsUI = ui;
+    window._heartsGame = initialGame;
+    document.getElementById("hearts-btn-new-game").addEventListener("click", function() {
+        initialGame.startNewGame();
+    });
+    document.getElementById("hearts-btn-online").addEventListener("click", function() {
+        document.getElementById("screen-main-hearts").style.display = "none";
+        document.getElementById("app").style.display = "flex";
+        initialGame.startNewGame();
+        var onlineModal = document.getElementById("modal-online");
+        if (onlineModal) onlineModal.classList.remove("hidden");
+    });
+    document.getElementById("hearts-btn-rules").addEventListener("click", function() {
+        document.getElementById("screen-main-hearts").style.display = "none";
+        document.getElementById("app").style.display = "flex";
+        initialGame.startNewGame();
+        var rulesModal = document.getElementById("modal-rules");
+        if (rulesModal) rulesModal.classList.remove("hidden");
+    });
+    document.getElementById("hearts-btn-settings").addEventListener("click", function() {
+        document.getElementById("screen-main-hearts").style.display = "none";
+        document.getElementById("app").style.display = "flex";
+        initialGame.startNewGame();
+        var settingsModal = document.getElementById("modal-settings");
+        if (settingsModal) settingsModal.classList.remove("hidden");
+    });
 
     // Toggle Pass-and-Play human count visibility in New Game modal
     const radioModes = document.querySelectorAll('input[name="game-mode"]');
