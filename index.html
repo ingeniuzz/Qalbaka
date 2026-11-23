@@ -1442,6 +1442,7 @@ html, body {
 
 
 
+
     <!-- Lucide icons or SVG equivalents -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2066,6 +2067,7 @@ html, body {
     </script>
 
     <!-- Scripts (Ordered cleanly so no CORS or bundling is required!) -->
+    
     
     
     
@@ -4064,6 +4066,8 @@ class HeartsNetwork {
                 if (window.tableUI && window.tableUI.game) {
                     const cards = (data.cards || []).map(c => new Card(c.suit, c.rank));
                     window.tableUI.game.setPlayerPassSelection(data.senderSeat, cards);
+                    if (window.tableUI.updateControls) window.tableUI.updateControls();
+                    if (window.tableUI.updateStatusBanner) window.tableUI.updateStatusBanner();
                 }
                 return;
             } else if (data.type === 'play_card') {
@@ -4958,6 +4962,8 @@ class TableUI {
     constructor() {
         this.game = null;
         this.selectedPassCardIds = new Set();
+        this.hostPassedCardIds = null;
+        this.onlineGuestPassedCardIds = null;
         this.activeHintCard = null;
         this.currentViewingPlayerIndex = 0; // In Pass-and-Play, which human is viewing
         window.tableUI = this;
@@ -5152,6 +5158,10 @@ class TableUI {
         return (playerIndex - this.currentViewingPlayerIndex + 4) % 4;
     }
 
+    setViewingPlayer(playerIndex) {
+        this.currentViewingPlayerIndex = playerIndex;
+    }
+
     // Attach to game instance and register callbacks
     bindGame(game) {
         this.game = game;
@@ -5202,6 +5212,7 @@ class TableUI {
                 const stageName = data.completedStage === 1 ? 'Left' : (data.completedStage === 2 ? 'Front' : 'Right');
                 this.showToast(`Stage ${data.completedStage}/3 (${stageName}) passed! Next pass starting.`);
                 this.selectedPassCardIds.clear();
+                this.hostPassedCardIds = null;
 
                 // Host sends updated hand and received cards to guests
                 if (window.heartsNetwork && window.heartsNetwork.isHost && window.heartsNetwork.isConnected) {
@@ -5216,13 +5227,14 @@ class TableUI {
                                 myHand: guestHand,
                                 receivedCards: received,
                                 passStage: this.game.passStage,
-                                nextPhase: this.game.currentPhase
+                                nextPhase: HeartsGame.PHASES.PASSING
                             });
                         }
                     });
                 }
             } else if (event === 'passed') {
                 this.selectedPassCardIds.clear();
+                this.hostPassedCardIds = null;
                 this.showToast('Passing phase complete! Starting round.');
 
                 // Host sends final exchanged hands to guests
@@ -5238,11 +5250,14 @@ class TableUI {
                                 myHand: guestHand,
                                 receivedCards: received,
                                 passStage: this.game.passStage,
-                                nextPhase: this.game.currentPhase
+                                nextPhase: HeartsGame.PHASES.PLAYING
                             });
                         }
                     });
                 }
+            } else if (event === 'passing_update') {
+                this.updateControls();
+                this.updateStatusBanner();
             }
             this.renderAll();
             this.updateStatusBanner();
@@ -5398,7 +5413,8 @@ class TableUI {
                 cardEl.dataset.cardId = card.id;
 
                 const isSelectedForPass = this.selectedPassCardIds.has(card.id);
-                if (isSelectedForPass) {
+                const isAlreadyPassed = this.hostPassedCardIds && this.hostPassedCardIds.has(card.id);
+                if (isSelectedForPass || isAlreadyPassed) {
                     cardEl.classList.add('selected-pass');
                 }
 
@@ -5428,6 +5444,11 @@ class TableUI {
                     const passBadge = document.createElement('div');
                     passBadge.className = 'pass-badge-indicator';
                     passBadge.textContent = '▲ PASS';
+                    cardEl.appendChild(passBadge);
+                } else if (isAlreadyPassed) {
+                    const passBadge = document.createElement('div');
+                    passBadge.className = 'pass-badge-indicator';
+                    passBadge.textContent = '✓ READY';
                     cardEl.appendChild(passBadge);
                 }
 
@@ -5588,8 +5609,22 @@ class TableUI {
                     dirLabel = HeartsRules.getPassDirectionLabel(this.game.passDirection);
                 }
                 this.passDirectionText.textContent = dirLabel;
-                this.btnConfirmPass.disabled = this.selectedPassCardIds.size !== 3;
-                this.btnConfirmPass.textContent = `Pass 3 Cards (${this.selectedPassCardIds.size}/3)`;
+
+                const isOnlineHost = window.heartsNetwork && window.heartsNetwork.isConnected && window.heartsNetwork.isHost;
+                const hostHasPassed = isOnlineHost && this.hostPassedCardIds && this.hostPassedCardIds.size === 3;
+                const allSelected = this.game.players.every(p => p.passedCards && p.passedCards.length === 3);
+
+                if (hostHasPassed && !allSelected) {
+                    const waitingNames = this.game.players.filter(p => p.isHuman && p.passedCards.length < 3).map(p => p.name).join(', ');
+                    this.btnConfirmPass.disabled = true;
+                    this.btnConfirmPass.textContent = 'Waiting for friends...';
+                    if (this.statusBannerEl) {
+                        this.statusBannerEl.textContent = `✓ You passed 3 cards! Waiting for ${waitingNames || 'friends'}...`;
+                    }
+                } else {
+                    this.btnConfirmPass.disabled = this.selectedPassCardIds.size !== 3;
+                    this.btnConfirmPass.textContent = `Pass 3 Cards (${this.selectedPassCardIds.size}/3)`;
+                }
             }
         }
     }
@@ -5608,7 +5643,16 @@ class TableUI {
                 } else {
                     dirLabel = HeartsRules.getPassDirectionLabel(this.game.passDirection);
                 }
-                this.statusBannerEl.textContent = `Round ${this.game.roundNumber}: ${dirLabel}`;
+                const isOnlineHost = window.heartsNetwork && window.heartsNetwork.isConnected && window.heartsNetwork.isHost;
+                const hostHasPassed = isOnlineHost && this.hostPassedCardIds && this.hostPassedCardIds.size === 3;
+                const allSelected = this.game.players.every(p => p.passedCards && p.passedCards.length === 3);
+
+                if (hostHasPassed && !allSelected) {
+                    const waitingNames = this.game.players.filter(p => p.isHuman && p.passedCards.length < 3).map(p => p.name).join(', ');
+                    this.statusBannerEl.textContent = `✓ You passed 3 cards (${dirLabel})! Waiting for ${waitingNames || 'friends'}...`;
+                } else {
+                    this.statusBannerEl.textContent = `Round ${this.game.roundNumber}: ${dirLabel}`;
+                }
                 break;
             case HeartsGame.PHASES.PLAYING:
                 const activeP = this.game.players[this.game.activePlayerIndex];
@@ -5635,6 +5679,10 @@ class TableUI {
             // Passing phase for Online Guest
             const isPassing = this.onlineIsPassingPhase || (this.onlinePassDirection && this.onlinePassDirection !== 'hold');
             if (isPassing) {
+                if (this.onlineGuestPassedCardIds && this.onlineGuestPassedCardIds.size === 3) {
+                    this.showToast('You already passed your cards! Waiting for other players...');
+                    return;
+                }
                 if (window.soundEngine) window.soundEngine.playCardSelect();
                 if (this.selectedPassCardIds.has(card.id)) {
                     this.selectedPassCardIds.delete(card.id);
@@ -5684,6 +5732,10 @@ class TableUI {
 
         // If Passing phase
         if (this.game.currentPhase === HeartsGame.PHASES.PASSING) {
+            if (this.hostPassedCardIds && this.hostPassedCardIds.size === 3) {
+                this.showToast('You already passed your cards! Waiting for friends...');
+                return;
+            }
             if (window.soundEngine) window.soundEngine.playCardSelect();
             if (this.selectedPassCardIds.has(card.id)) {
                 this.selectedPassCardIds.delete(card.id);
@@ -5733,18 +5785,34 @@ class TableUI {
         // Online Guest routing
         if (window.heartsNetwork && window.heartsNetwork.isConnected && !window.heartsNetwork.isHost) {
             const selectedCards = this.onlineGuestHand.filter(c => this.selectedPassCardIds.has(c.id));
+            if (selectedCards.length !== 3) return;
+            this.onlineGuestPassedCardIds = new Set(this.selectedPassCardIds);
             this.selectedPassCardIds.clear();
             window.heartsNetwork.submitPassCards(selectedCards);
-            if (this.passControlsEl) this.passControlsEl.classList.add('hidden');
-            if (this.statusBannerEl) this.statusBannerEl.textContent = 'Cards passed! Waiting for other players...';
+            if (this.btnConfirmPass) {
+                this.btnConfirmPass.disabled = true;
+                this.btnConfirmPass.textContent = 'Waiting for other players...';
+            }
+            if (this.statusBannerEl) this.statusBannerEl.textContent = '✓ You passed 3 cards! Waiting for other players...';
+            this.showToast('Cards passed! Waiting for other players...', 2500);
             this.renderOnlineGuestHand();
             return;
         }
 
         const player = this.game.players[this.currentViewingPlayerIndex];
         const selectedCards = player.hand.filter(c => this.selectedPassCardIds.has(c.id));
-        this.selectedPassCardIds.clear();
+        if (selectedCards.length !== 3) return;
 
+        if (window.heartsNetwork && window.heartsNetwork.isConnected && window.heartsNetwork.isHost) {
+            this.hostPassedCardIds = new Set(this.selectedPassCardIds);
+            this.selectedPassCardIds.clear();
+            this.game.setPlayerPassSelection(this.currentViewingPlayerIndex, selectedCards);
+            this.renderPlayerHand(this.currentViewingPlayerIndex);
+            this.updateControls();
+            return;
+        }
+
+        this.selectedPassCardIds.clear();
         this.game.setPlayerPassSelection(this.currentViewingPlayerIndex, selectedCards);
     }
 
@@ -6396,6 +6464,7 @@ class TableUI {
             this.onlineIsPassingPhase = data.passDirection && data.passDirection !== 'hold';
             this.onlineCurrentTrick = [];
             this.selectedPassCardIds.clear();
+            this.onlineGuestPassedCardIds = null;
 
             if (data.hands) {
                 const myHandCards = data.hands[this.onlineMySeat] || data.hands[1] || [];
@@ -6441,8 +6510,11 @@ class TableUI {
             if (data.playerNames) this.onlinePlayerNames = data.playerNames;
             if (data.playerAvatars) this.onlinePlayerAvatars = data.playerAvatars;
             const mySeat = net.mySeatIndex || 1;
-            if (this.currentViewingPlayerIndex !== mySeat) {
-                this.setViewingPlayer(mySeat);
+            this.setViewingPlayer(mySeat);
+
+            // Avoid race condition wiping card selection on round 1 if game_start already processed
+            if (this.onlineRoundNumber === (data.roundNumber || 1) && this.onlineGuestHand && this.onlineGuestHand.length === 13 && (this.selectedPassCardIds.size > 0 || this.onlineGuestPassedCardIds)) {
+                return;
             }
 
             const rawCards = (data.hands && (data.hands[mySeat] || data.hands[1])) || data.myHand || [];
@@ -6453,6 +6525,7 @@ class TableUI {
             this.onlineIsPassingPhase = data.passDirection && data.passDirection !== 'hold';
             this.onlineCurrentTrick = [];
             this.selectedPassCardIds.clear();
+            this.onlineGuestPassedCardIds = null;
 
             this.updateOnlinePlayerBadges(data.scores);
             this.renderOnlineGuestHand();
@@ -6487,6 +6560,7 @@ class TableUI {
             this.onlineGuestHand = data.myHand.map(c => new Card(c.suit, c.rank));
             this.onlineReceivedCards = (data.receivedCards || []).map(c => new Card(c.suit, c.rank));
             this.selectedPassCardIds.clear();
+            this.onlineGuestPassedCardIds = null;
             this.onlineIsPassingPhase = data.nextPhase === HeartsGame.PHASES.PASSING;
 
             if (window.soundEngine) window.soundEngine.playCardPass();
@@ -6496,12 +6570,23 @@ class TableUI {
                 this.showToast('Passing phase complete! Starting round.');
             } else {
                 this.showToast(`Pass completed! Next stage starting.`);
+                if (this.passControlsEl) {
+                    this.passControlsEl.classList.remove('hidden');
+                    if (this.btnConfirmPass) {
+                        this.btnConfirmPass.disabled = true;
+                        this.btnConfirmPass.textContent = 'Pass 3 Cards (0/3)';
+                    }
+                }
             }
 
             this.renderOnlineGuestHand();
         };
 
         net.onTurnUpdated = (data) => {
+            this.onlineIsPassingPhase = false;
+            this.onlineGuestPassedCardIds = null;
+            if (this.passControlsEl) this.passControlsEl.classList.add('hidden');
+
             this.onlineActivePlayerIndex = data.activePlayerIndex;
             this.onlineCurrentTrick = (data.currentTrick || []).map(p => ({ playerIndex: p.playerIndex, card: new Card(p.card.suit, p.card.rank) }));
             this.onlineHeartsBroken = data.heartsBroken;
@@ -6665,12 +6750,10 @@ class TableUI {
             cardEl.dataset.cardId = card.id;
 
             const isSelected = this.selectedPassCardIds.has(card.id);
-            if (isSelected) {
+            const isAlreadyPassed = this.onlineGuestPassedCardIds && this.onlineGuestPassedCardIds.has(card.id);
+
+            if (isSelected || isAlreadyPassed) {
                 cardEl.classList.add('selected-pass');
-                const badge = document.createElement('div');
-                badge.className = 'pass-badge-indicator';
-                badge.textContent = '▲ PASS';
-                cardEl.appendChild(badge);
             }
 
             if (isPassingPhase && this.onlineReceivedCards && this.onlineReceivedCards.some(rc => rc.id === card.id)) {
@@ -6687,6 +6770,18 @@ class TableUI {
             }
 
             cardEl.innerHTML = CardRenderer.renderCardFace(card);
+
+            if (isSelected) {
+                const badge = document.createElement('div');
+                badge.className = 'pass-badge-indicator';
+                badge.textContent = '▲ PASS';
+                cardEl.appendChild(badge);
+            } else if (isAlreadyPassed) {
+                const badge = document.createElement('div');
+                badge.className = 'pass-badge-indicator';
+                badge.textContent = '✓ READY';
+                cardEl.appendChild(badge);
+            }
 
             cardEl.addEventListener('click', (e) => {
                 e.stopPropagation();
