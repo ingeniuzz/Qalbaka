@@ -2525,7 +2525,7 @@ class TekkaNetwork {
         this.password = opts.password || '';
         this.playerName = opts.playerName || 'Guest';
         this.isHost = opts.isHost || false;
-        this.mySeatIndex = opts.seatIndex !== undefined ? opts.seatIndex : (this.isHost ? SEAT.SOUTH : null);
+        this.mySeatIndex = opts.seatIndex !== undefined ? opts.seatIndex : (this.isHost ? SEAT.SOUTH : 1);
 
         this.baseTopic = `tekka/v1/${this.roomCode}/${this._hashPassword(this.password)}`;
 
@@ -2545,9 +2545,10 @@ class TekkaNetwork {
 
             this.client.on('connect', () => {
                 this.connected = true;
-                this._subscribe();
-                this._announce();
-                this._startHeartbeat();
+                this._subscribe(() => {
+                    this._announce();
+                    this._startHeartbeat();
+                });
                 if (this.onConnectionChange) this.onConnectionChange(true, broker.host);
             });
 
@@ -2572,14 +2573,16 @@ class TekkaNetwork {
         }
     }
 
-    _subscribe() {
+    _subscribe(cb) {
         const topics = [
             `${this.baseTopic}/lobby`,
             `${this.baseTopic}/game`,
             `${this.baseTopic}/chat`,
             `${this.baseTopic}/state`
         ];
-        topics.forEach(t => this.client.subscribe(t, { qos: 1 }));
+        this.client.subscribe(topics, { qos: 1 }, (err) => {
+            if (!err && cb) cb();
+        });
     }
 
     _announce() {
@@ -2630,19 +2633,19 @@ class TekkaNetwork {
     // -------------------------------------------------------------------------
     // Message sending
     // -------------------------------------------------------------------------
-    sendBid(bid) {
+    sendBid(bid, seatIndex = null) {
         this._publish('game', {
             type: 'bid',
-            seat: this.mySeatIndex,
+            seat: seatIndex !== null ? seatIndex : this.mySeatIndex,
             bid,
             ts: Date.now()
         });
     }
 
-    sendCardPlayed(card) {
+    sendCardPlayed(card, seatIndex = null) {
         this._publish('game', {
             type: 'play',
-            seat: this.mySeatIndex,
+            seat: seatIndex !== null ? seatIndex : this.mySeatIndex,
             card: { suit: card.suit, rank: card.rank },
             ts: Date.now()
         });
@@ -3121,6 +3124,16 @@ class TekkaUI {
         const isMyTurn = this.onlineMode ? (bidder === mySeat) : this.game.players[bidder].isHuman;
         const isBotTurn = this.onlineMode ? (this.net.isHost && this.game.players[bidder].isBot) : (!this.game.players[bidder].isHuman);
 
+        if (this.elBidStatus) {
+            if (isMyTurn) {
+                this.elBidStatus.textContent = `Your turn to bid! Current high: ${this._formatBid(this.game.highBid)}`;
+                this.elBidStatus.style.color = 'var(--gold-light)';
+            } else {
+                this.elBidStatus.textContent = `Waiting for ${name} to bid... (High: ${this._formatBid(this.game.highBid)})`;
+                this.elBidStatus.style.color = 'var(--text-light)';
+            }
+        }
+
         if (isMyTurn) {
             this._updateStatusMsg(`Your turn to bid. Current high bid: ${this._formatBid(this.game.highBid)}`);
             this._renderBidButtons(legal, bidder);
@@ -3149,7 +3162,7 @@ class TekkaUI {
         );
 
         if (this.onlineMode && this.net.isHost) {
-            this.net.sendBid(bid);
+            this.net.sendBid(bid, seatIndex);
         }
         this._applyBid(seatIndex, bid);
     }
@@ -3210,7 +3223,7 @@ class TekkaUI {
         const hand = this.game.getPlayerHand(seatIndex);
         const card = TekkaAI.chooseTrumpLead(hand, this.game.difficulty);
         if (this.onlineMode && this.net.isHost) {
-            this.net.sendCardPlayed(card);
+            this.net.sendCardPlayed(card, seatIndex);
         }
         this._applyCardPlay(seatIndex, card);
     }
@@ -3229,7 +3242,7 @@ class TekkaUI {
             btn.textContent = this._formatBid(bid);
             btn.addEventListener('click', () => {
                 if (this.onlineMode) {
-                    this.net.sendBid(bid);
+                    this.net.sendBid(bid, forSeat);
                 }
                 this._applyBid(forSeat, bid);
             });
@@ -3341,7 +3354,7 @@ class TekkaUI {
                     nextPlayer, this.game, this.game.difficulty
                 );
                 if (this.onlineMode && this.net.isHost) {
-                    this.net.sendCardPlayed(card);
+                    this.net.sendCardPlayed(card, nextPlayer);
                 }
                 this._applyCardPlay(nextPlayer, card);
             }, this.botDelay);
@@ -3584,7 +3597,7 @@ class TekkaUI {
             this.showAnnouncement(mySeat, announcement);
             if (this.onlineMode) this.net.sendCardAnnouncement(card, announcement);
         }
-        if (this.onlineMode) this.net.sendCardPlayed(card);
+        if (this.onlineMode) this.net.sendCardPlayed(card, mySeat);
         this._applyCardPlay(mySeat, card);
     }
 
@@ -3658,6 +3671,20 @@ class TekkaUI {
         const [a, b] = this.game.teamScores;
         if (this.elTeamA) this.elTeamA.textContent = `N/S: ${a}`;
         if (this.elTeamB) this.elTeamB.textContent = `W/E: ${b}`;
+    }
+
+    _updatePlayerBadges() {
+        const mySeat = this._getMySeat();
+        for (let i = 0; i < 4; i++) {
+            const zone = this.elPlayers[i];
+            if (!zone) continue;
+            const nameEl = zone.querySelector('.p-name');
+            if (nameEl) {
+                const p = this.game.players[i];
+                const isMe = i === mySeat;
+                nameEl.textContent = isMe ? `${p.name} (You)` : p.name;
+            }
+        }
     }
 
     _updateTrickCounts() {
@@ -3911,12 +3938,26 @@ class TekkaUI {
                     this.game.players[s.seatIndex].isBot = s.isBot;
                     this.game.players[s.seatIndex].isHuman = !s.isBot;
                 });
+
+                if (!this.net.isHost) {
+                    const myName = (this.net.playerName || '').trim().toLowerCase();
+                    const matched = data.playerSeats.find(s => s.name && s.name.trim().toLowerCase() === myName && !s.isBot);
+                    if (matched) {
+                        this.net.mySeatIndex = matched.seatIndex;
+                    } else {
+                        const humanSeat = data.playerSeats.find(s => s.seatIndex !== 0 && !s.isBot);
+                        this.net.mySeatIndex = humanSeat ? humanSeat.seatIndex : 1;
+                    }
+                }
+            } else if (!this.net.isHost) {
+                this.net.mySeatIndex = 1;
             }
 
             this._showScreen('screen-game');
             this._resetBoard();
             this._renderAllHands();
             this._updateScoreDisplay();
+            this._updatePlayerBadges();
             this._startBidding();
         };
 
@@ -4004,6 +4045,7 @@ class TekkaUI {
         this._resetBoard();
         this._renderAllHands();
         this._updateScoreDisplay();
+        this._updatePlayerBadges();
         this._startBidding();
     }
 
