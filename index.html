@@ -389,15 +389,42 @@ html, body {
     margin-left: 0;
 }
 
-/* Opponent hands: completely hidden from table (MobilityWare style) */
-.pos-north .hand-cards,
-.pos-west .hand-cards,
-.pos-east .hand-cards {
-    display: none !important;
+/* Opponent Hand Layout */
+.pos-west {
+    left: 12px;
+    top: 45%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: row-reverse;
+    align-items: center;
+    gap: 8px;
+}
+
+.pos-east {
+    right: 12px;
+    top: 45%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+}
+
+.pos-north {
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
 }
 
 .card-facedown {
-    display: none !important;
+    width: 28px;
+    height: 40px;
+    border-radius: 4px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
 }
 
 /* Interactive Human Cards */
@@ -451,6 +478,9 @@ html, body {
 
 .center-trick-area {
     position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
     width: 280px;
     height: 220px;
     pointer-events: none;
@@ -1248,54 +1278,135 @@ html, body {
         letter-spacing: 6px;
     }
 
-    /* Player Stations */
-    .pos-north {
-        top: 6px;
-    }
-    .pos-north .avatar-circle {
-        width: 28px;
-        height: 28px;
-        font-size: 0.95rem;
-    }
-
-    /* West & East positioned higher up so trick cards never collide with them */
+    /* West: Cards on the LEFT, Name on the RIGHT! */
     .pos-west {
         left: 4px;
-        top: 33%;
+        top: 36%;
         transform: translateY(-50%);
+        display: flex;
+        flex-direction: row-reverse !important;
+        align-items: center;
+        gap: 6px;
+        z-index: 10;
     }
-    .pos-east {
-        right: 4px;
-        top: 33%;
-        transform: translateY(-50%);
+    .pos-west .hand-cards {
+        display: flex !important;
+        flex-direction: column;
+        width: 18px;
+        height: 48px;
+        justify-content: center;
+        align-items: center;
+        margin: 0;
+    }
+    .pos-west .card-facedown {
+        display: block !important;
+        width: 18px;
+        height: 26px;
+        border-radius: 3px;
+        margin-top: -19px;
+        box-shadow: -1px 2px 4px rgba(0, 0, 0, 0.4);
+    }
+    .pos-west .card-facedown:first-child {
+        margin-top: 0;
     }
 
-    /* Compact Player Badges */
-    .player-badge {
-        padding: 0.2rem 0.45rem 0.2rem 0.25rem;
-        gap: 0.35rem;
-        border-radius: 9999px;
+    /* East: Name on the LEFT, Cards on the RIGHT! */
+    .pos-east {
+        right: 4px;
+        top: 36%;
+        transform: translateY(-50%);
+        display: flex;
+        flex-direction: row !important;
+        align-items: center;
+        gap: 6px;
+        z-index: 10;
     }
-    .avatar-circle {
+    .pos-east .hand-cards {
+        display: flex !important;
+        flex-direction: column;
+        width: 18px;
+        height: 48px;
+        justify-content: center;
+        align-items: center;
+        margin: 0;
+    }
+    .pos-east .card-facedown {
+        display: block !important;
+        width: 18px;
+        height: 26px;
+        border-radius: 3px;
+        margin-top: -19px;
+        box-shadow: 1px 2px 4px rgba(0, 0, 0, 0.4);
+    }
+    .pos-east .card-facedown:first-child {
+        margin-top: 0;
+    }
+
+    /* North: Centered at top */
+    .pos-north {
+        top: 4px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+        z-index: 10;
+    }
+    .pos-north .avatar-circle {
         width: 26px;
         height: 26px;
         font-size: 0.95rem;
     }
+    .pos-north .hand-cards {
+        display: flex !important;
+        flex-direction: row;
+        height: 20px;
+        justify-content: center;
+        align-items: center;
+        margin: 0;
+    }
+    .pos-north .card-facedown {
+        display: block !important;
+        width: 18px;
+        height: 24px;
+        border-radius: 3px;
+        margin-left: -12px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+    }
+    .pos-north .card-facedown:first-child {
+        margin-left: 0;
+    }
+
+    /* Compact Player Badges */
+    .player-badge {
+        padding: 0.2rem 0.5rem 0.2rem 0.25rem;
+        gap: 0.35rem;
+        border-radius: 9999px;
+        max-width: 135px;
+    }
+    .avatar-circle {
+        width: 24px;
+        height: 24px;
+        font-size: 0.9rem;
+    }
     .player-name {
-        font-size: 0.72rem;
-        max-width: 65px;
+        font-size: 0.7rem;
+        max-width: 58px;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
     }
     .player-scores {
-        font-size: 0.62rem;
-        gap: 0.3rem;
+        font-size: 0.6rem;
+        gap: 0.25rem;
     }
     .card-count-badge {
         font-size: 0.58rem;
         padding: 1px 4px;
-        margin-top: 2px;
+        margin-top: 0;
+        background: rgba(0, 0, 0, 0.55);
+        border-radius: 9999px;
     }
 
     /* South Player Station (Human) */
@@ -1315,11 +1426,6 @@ html, body {
         width: 100%;
         margin-top: 0.2rem;
         padding-bottom: 2px;
-    }
-    .pos-north .hand-cards,
-    .pos-west .hand-cards,
-    .pos-east .hand-cards {
-        display: none !important;
     }
 
     /* Human South Cards responsive sizing */
@@ -1349,23 +1455,30 @@ html, body {
         top: -12px;
     }
 
-    /* Center Trick Area */
+    /* Center Trick Area - Perfectly Centered on Mobile */
     .center-trick-area {
+        position: absolute;
+        left: 50% !important;
+        top: 44% !important;
+        transform: translate(-50%, -50%) !important;
         width: 150px;
         height: 140px;
-        top: 42%;
-        transform: translateY(-50%);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        pointer-events: none;
+        z-index: 20;
     }
     .trick-card {
-        width: 50px;
-        height: 72px;
+        width: 48px;
+        height: 68px;
         border-radius: 6px;
     }
     .trick-card.pos-south {
-        transform: translate(0, 24px);
+        transform: translate(0, 25px);
     }
     .trick-card.pos-north {
-        transform: translate(0, -24px);
+        transform: translate(0, -25px);
     }
     .trick-card.pos-west {
         transform: translate(-30px, 0);
@@ -1376,11 +1489,11 @@ html, body {
 
     @keyframes playFromSouth {
         from { transform: translate(0, 100px) scale(0.9); opacity: 0; }
-        to { transform: translate(0, 24px) scale(1); opacity: 1; }
+        to { transform: translate(0, 25px) scale(1); opacity: 1; }
     }
     @keyframes playFromNorth {
         from { transform: translate(0, -100px) scale(0.9); opacity: 0; }
-        to { transform: translate(0, -24px) scale(1); opacity: 1; }
+        to { transform: translate(0, -25px) scale(1); opacity: 1; }
     }
     @keyframes playFromWest {
         from { transform: translate(-100px, 0) scale(0.9); opacity: 0; }
@@ -1438,10 +1551,13 @@ html, body {
     }
 
     .status-banner {
-        top: 48px;
+        top: 60px;
+        left: 50% !important;
+        transform: translateX(-50%) !important;
         font-size: 0.72rem;
         padding: 0.2rem 0.65rem;
-        max-width: 80vw;
+        max-width: 82vw;
+        white-space: nowrap;
     }
 
     .online-hud {
@@ -1552,6 +1668,7 @@ html, body {
 }
 
     </style>
+
 
 
 
@@ -2264,6 +2381,7 @@ html, body {
     </script>
 
     <!-- Scripts (Ordered cleanly so no CORS or bundling is required!) -->
+    
     
     
     
@@ -5764,10 +5882,20 @@ class TableUI {
                 });
             }
         } else {
-            // MobilityWare style: Opponents only show their avatar/name badge and card count!
-            // Do NOT render card backs on the table!
-            cardsContainer.innerHTML = '';
+            // Render a neat compact stack of card backs for opponents
+            const cardBackSvg = CardRenderer.renderCardBack(this.game.settings.cardBackTheme);
             const count = player.hand.length;
+
+            cardsContainer.innerHTML = '';
+            const maxCards = Math.min(count, 4);
+            for (let i = 0; i < maxCards; i++) {
+                const cardEl = document.createElement('div');
+                cardEl.className = 'card-wrapper card-facedown';
+                cardEl.innerHTML = cardBackSvg;
+                cardsContainer.appendChild(cardEl);
+            }
+
+            // Card count badge
             const countBadge = container.querySelector('.card-count-badge');
             if (countBadge) {
                 countBadge.textContent = `${count} cards`;
@@ -5925,7 +6053,8 @@ class TableUI {
                 const activeP = this.game.players[this.game.activePlayerIndex];
                 const leadText = this.game.currentTrick.length === 0 ? 'to lead' : 'to play';
                 const heartsText = this.game.heartsBroken ? ' | Hearts Broken ♥' : '';
-                this.statusBannerEl.textContent = `Trick ${this.game.trickNumber}/13: ${activeP.name}'s turn ${leadText}${heartsText}`;
+                const turnLabel = activeP.isHuman ? 'Your' : `${activeP.name}'s`;
+                this.statusBannerEl.textContent = `Trick ${this.game.trickNumber}/13: ${turnLabel} turn ${leadText}${heartsText}`;
                 break;
             case HeartsGame.PHASES.ROUND_END:
                 this.statusBannerEl.textContent = `Round ${this.game.roundNumber} Complete!`;
@@ -7141,12 +7270,20 @@ class TableUI {
     }
 
     renderOnlineStationCardCounts(count) {
+        const cardBackSvg = CardRenderer.renderCardBack('sapphire');
         for (let station = 1; station < 4; station++) {
             const container = this.playerContainers[station];
             if (!container) continue;
             const handCards = container.querySelector('.hand-cards');
             if (handCards) {
                 handCards.innerHTML = '';
+                const maxCards = Math.min(count, 4);
+                for (let i = 0; i < maxCards; i++) {
+                    const cardEl = document.createElement('div');
+                    cardEl.className = 'card-wrapper card-facedown';
+                    cardEl.innerHTML = cardBackSvg;
+                    handCards.appendChild(cardEl);
+                }
             }
             const badge = container.querySelector('.card-count-badge');
             if (badge) {
