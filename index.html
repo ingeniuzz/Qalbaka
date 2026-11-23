@@ -389,10 +389,15 @@ html, body {
     margin-left: 0;
 }
 
+/* Opponent hands: completely hidden from table (MobilityWare style) */
+.pos-north .hand-cards,
+.pos-west .hand-cards,
+.pos-east .hand-cards {
+    display: none !important;
+}
+
 .card-facedown {
-    width: 48px;
-    height: 68px;
-    margin-left: -28px;
+    display: none !important;
 }
 
 /* Interactive Human Cards */
@@ -400,10 +405,12 @@ html, body {
     cursor: pointer;
 }
 
-.card-interactive:hover {
-    transform: translateY(-22px) scale(1.06);
-    box-shadow: var(--card-shadow-lifted);
-    z-index: 30;
+@media (hover: hover) and (pointer: fine) {
+    .card-interactive:hover {
+        transform: translateY(-22px) scale(1.06);
+        box-shadow: var(--card-shadow-lifted);
+        z-index: 30;
+    }
 }
 
 /* Selected for Passing */
@@ -417,15 +424,8 @@ html, body {
 
 /* Newly received cards during multi-stage passing */
 .card-wrapper.newly-received {
-    box-shadow: 0 0 16px rgba(16, 185, 129, 0.9), var(--card-shadow) !important;
+    box-shadow: 0 0 14px rgba(16, 185, 129, 0.85), var(--card-shadow) !important;
     outline: 2.5px solid #10b981 !important;
-    animation: receivedPulse 1.2s ease-out;
-}
-
-@keyframes receivedPulse {
-    0% { transform: translateY(-14px) scale(1.08); }
-    50% { transform: translateY(-6px) scale(1.04); }
-    100% { transform: translateY(0) scale(1); }
 }
 
 /* Playable card highlight during your turn */
@@ -1316,23 +1316,10 @@ html, body {
         margin-top: 0.2rem;
         padding-bottom: 2px;
     }
-    .pos-north .hand-cards {
-        height: 38px;
-        margin-bottom: 0.15rem;
-    }
-    .pos-west .hand-cards, .pos-east .hand-cards {
-        height: 34px;
-        margin: 0.15rem 0;
-    }
-    .pos-north .card-facedown {
-        width: 28px;
-        height: 38px;
-        margin-left: -18px;
-    }
-    .pos-west .card-facedown, .pos-east .card-facedown {
-        width: 24px;
-        height: 34px;
-        margin-left: -16px;
+    .pos-north .hand-cards,
+    .pos-west .hand-cards,
+    .pos-east .hand-cards {
+        display: none !important;
     }
 
     /* Human South Cards responsive sizing */
@@ -1346,9 +1333,9 @@ html, body {
         margin-left: 0 !important;
     }
 
-    /* Mobile Lift and Active State */
-    .card-interactive:hover, .card-interactive:active {
-        transform: translateY(-16px) scale(1.06);
+    /* Mobile Active State - only transform on actual tap, no sticky hover */
+    .card-interactive:active {
+        transform: translateY(-10px) scale(1.03);
     }
     .card-wrapper.selected-pass {
         transform: translateY(-24px) scale(1.08) !important;
@@ -1565,6 +1552,7 @@ html, body {
 }
 
     </style>
+
 
 
 
@@ -2276,6 +2264,7 @@ html, body {
     </script>
 
     <!-- Scripts (Ordered cleanly so no CORS or bundling is required!) -->
+    
     
     
     
@@ -5775,21 +5764,10 @@ class TableUI {
                 });
             }
         } else {
-            // Render face-down cards for AI or hidden human players
-            const cardBackSvg = CardRenderer.renderCardBack(this.game.settings.cardBackTheme);
+            // MobilityWare style: Opponents only show their avatar/name badge and card count!
+            // Do NOT render card backs on the table!
+            cardsContainer.innerHTML = '';
             const count = player.hand.length;
-            const isMobile = window.innerWidth <= 640;
-
-            // Render a stacked fan of card backs (compact on mobile)
-            const maxCards = isMobile ? Math.min(count, 5) : Math.min(count, 13);
-            for (let i = 0; i < maxCards; i++) {
-                const cardEl = document.createElement('div');
-                cardEl.className = 'card-wrapper card-facedown';
-                cardEl.innerHTML = cardBackSvg;
-                cardsContainer.appendChild(cardEl);
-            }
-
-            // Card count badge
             const countBadge = container.querySelector('.card-count-badge');
             if (countBadge) {
                 countBadge.textContent = `${count} cards`;
@@ -5962,6 +5940,30 @@ class TableUI {
     // USER INTERACTIONS
     // ----------------------------------------------------
 
+    toggleCardPassUI(cardId, isSelected) {
+        const container = this.playerContainers[0];
+        if (!container) return;
+        const handContainer = container.querySelector('.hand-cards');
+        if (!handContainer) return;
+        const cardEl = handContainer.querySelector(`[data-card-id="${cardId}"]`);
+        if (!cardEl) return;
+
+        if (isSelected) {
+            cardEl.classList.add('selected-pass');
+            let badge = cardEl.querySelector('.pass-badge-indicator');
+            if (!badge) {
+                badge = document.createElement('div');
+                badge.className = 'pass-badge-indicator';
+                badge.textContent = '▲ PASS';
+                cardEl.appendChild(badge);
+            }
+        } else {
+            cardEl.classList.remove('selected-pass');
+            const badge = cardEl.querySelector('.pass-badge-indicator');
+            if (badge) badge.remove();
+        }
+    }
+
     handleCardClick(playerIndex, card) {
         // Online Guest routing
         if (window.heartsNetwork && window.heartsNetwork.isConnected && !window.heartsNetwork.isHost) {
@@ -5973,16 +5975,20 @@ class TableUI {
                     return;
                 }
                 if (window.soundEngine) window.soundEngine.playCardSelect();
+                let isSelected = false;
                 if (this.selectedPassCardIds.has(card.id)) {
                     this.selectedPassCardIds.delete(card.id);
+                    isSelected = false;
                 } else {
                     if (this.selectedPassCardIds.size < 3) {
                         this.selectedPassCardIds.add(card.id);
+                        isSelected = true;
                     } else {
                         this.showToast('You can only pass 3 cards. Tap a selected card to unselect it.');
+                        return;
                     }
                 }
-                this.renderOnlineGuestHand();
+                this.toggleCardPassUI(card.id, isSelected);
                 if (this.btnConfirmPass) {
                     this.btnConfirmPass.disabled = this.selectedPassCardIds.size !== 3;
                     this.btnConfirmPass.textContent = `Pass 3 Cards (${this.selectedPassCardIds.size}/3)`;
@@ -6026,16 +6032,20 @@ class TableUI {
                 return;
             }
             if (window.soundEngine) window.soundEngine.playCardSelect();
+            let isSelected = false;
             if (this.selectedPassCardIds.has(card.id)) {
                 this.selectedPassCardIds.delete(card.id);
+                isSelected = false;
             } else {
                 if (this.selectedPassCardIds.size < 3) {
                     this.selectedPassCardIds.add(card.id);
+                    isSelected = true;
                 } else {
                     this.showToast('You can only pass 3 cards. Click a selected card to unselect it.');
+                    return;
                 }
             }
-            this.renderPlayerHand(playerIndex);
+            this.toggleCardPassUI(card.id, isSelected);
             this.updateControls();
             return;
         }
@@ -7131,19 +7141,12 @@ class TableUI {
     }
 
     renderOnlineStationCardCounts(count) {
-        const cardBackSvg = CardRenderer.renderCardBack('sapphire');
         for (let station = 1; station < 4; station++) {
             const container = this.playerContainers[station];
             if (!container) continue;
             const handCards = container.querySelector('.hand-cards');
             if (handCards) {
                 handCards.innerHTML = '';
-                for (let i = 0; i < Math.min(count, 13); i++) {
-                    const cardEl = document.createElement('div');
-                    cardEl.className = 'card-wrapper card-facedown';
-                    cardEl.innerHTML = cardBackSvg;
-                    handCards.appendChild(cardEl);
-                }
             }
             const badge = container.querySelector('.card-count-badge');
             if (badge) {
