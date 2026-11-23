@@ -1,284 +1,3272 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>Ingeniuzz Games</title>
-<style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Tekka — Afghan Card Game</title>
+    <style>
+/* === Tekka Card Game: styles.css === */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-  :root {
-    --green-dark:  #1a3a2a;
-    --green-mid:   #1e4d35;
-    --green-felt:  #245c3e;
-    --gold:        #f0a500;
-    --gold-light:  #ffd166;
-    --cream:       #faf3e0;
-    --text-light:  #e8f5e9;
-    --text-muted:  #9abba7;
-    --card-red:    #e53935;
-    --card-black:  #212121;
-    --radius:      18px;
-    --shadow:      0 8px 32px rgba(0,0,0,0.5);
-  }
+:root {
+  --felt:         #1a5c38;
+  --felt-dark:    #0f3d26;
+  --felt-border:  #2d7a4f;
+  --gold:         #d4a017;
+  --gold-light:   #f0c040;
+  --team-a:       #2563eb;
+  --team-b:       #dc2626;
+  --text-light:   #f8fafc;
+  --text-muted:   #94a3b8;
+  --card-bg:      #ffffff;
+  --card-shadow:  rgba(0,0,0,0.5);
+  --overlay:      rgba(0,0,0,0.75);
+  --radius:       10px;
+  --header-h:     52px;
+  --footer-h:     130px;
+}
 
-  html, body {
-    height: 100%;
-    background: var(--green-dark);
-    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-    color: var(--text-light);
-    overflow-x: hidden;
-  }
+[data-theme="navy"]   { --felt: #1e3a5f; --felt-dark: #0f1e35; --felt-border: #2a4a7a; }
+[data-theme="crimson"]{ --felt: #5c1a1a; --felt-dark: #3a0f0f; --felt-border: #7a2a2a; }
 
-  body {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    min-height: 100dvh;
-    padding: 24px 16px 32px;
-    background:
-      radial-gradient(ellipse at 50% 0%, rgba(240,165,0,0.08) 0%, transparent 60%),
-      linear-gradient(180deg, #122b1e 0%, #1a3a2a 50%, #0f2318 100%);
-  }
+html, body {
+  height: 100%; width: 100%;
+  overflow: hidden;
+  background: var(--felt-dark);
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  color: var(--text-light);
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
 
-  /* ── Header ── */
-  .site-header {
-    text-align: center;
-    margin-bottom: 36px;
-    animation: fadeDown 0.6s ease both;
-  }
+/* ====================== SCREENS ====================== */
+.screen { width: 100%; height: 100vh; display: flex; flex-direction: column; }
+.hidden { display: none !important; }
 
-  .site-logo {
-    font-size: 2.4rem;
-    font-weight: 900;
-    letter-spacing: 3px;
-    text-transform: uppercase;
-    color: var(--gold);
-    text-shadow: 0 0 24px rgba(240,165,0,0.4);
-  }
+/* ====================== MAIN MENU ====================== */
+#screen-main {
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  background: radial-gradient(ellipse at 50% 20%, #2d7a4f 0%, #0f3d26 60%, #071a10 100%);
+}
 
-  .site-logo span { color: var(--cream); }
+.main-logo {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+.main-logo .game-title {
+  font-size: 3.5rem;
+  font-weight: 900;
+  letter-spacing: 4px;
+  color: var(--gold-light);
+  text-shadow: 0 2px 12px rgba(212,160,23,0.6), 0 0 40px rgba(212,160,23,0.3);
+}
+.main-logo .game-subtitle {
+  font-size: 1rem;
+  color: rgba(255,255,255,0.6);
+  letter-spacing: 2px;
+  margin-top: 0.25rem;
+}
+.main-logo .suit-row {
+  font-size: 2rem;
+  margin-top: 0.5rem;
+  letter-spacing: 8px;
+}
 
-  .suits-row {
-    font-size: 1.5rem;
-    margin-top: 4px;
-    letter-spacing: 10px;
-    color: var(--text-muted);
-  }
-  .suits-row .red  { color: var(--card-red); }
+.main-menu-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 90%;
+  max-width: 320px;
+}
 
-  .site-tagline {
-    font-size: 0.85rem;
-    color: var(--text-muted);
-    margin-top: 6px;
-    font-style: italic;
-    letter-spacing: 1px;
-  }
+.btn-menu-main {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  padding: 0.9rem 1.5rem;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 1.05rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.1s, filter 0.1s;
+}
+.btn-menu-main:active { transform: scale(0.97); }
+.btn-menu-main.primary { background: var(--gold); color: #1a1a1a; }
+.btn-menu-main.secondary { background: rgba(255,255,255,0.1); color: var(--text-light); border: 1.5px solid rgba(255,255,255,0.2); }
+.btn-menu-main.online { background: linear-gradient(135deg, #2563eb, #1d4ed8); color: white; }
 
-  /* ── Grid ── */
-  .games-grid {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 20px;
-    width: 100%;
-    max-width: 480px;
-  }
+/* ====================== GAME SCREEN ====================== */
+#screen-game {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
 
-  /* ── Game Card ── */
-  .game-card {
-    display: flex;
-    flex-direction: column;
-    background: linear-gradient(145deg, var(--green-mid), var(--green-dark));
-    border: 2px solid rgba(240,165,0,0.25);
-    border-radius: var(--radius);
-    padding: 24px 20px 20px;
-    text-decoration: none;
-    color: inherit;
-    cursor: pointer;
-    position: relative;
-    overflow: hidden;
-    box-shadow: var(--shadow);
-    transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
-    animation: fadeUp 0.6s ease both;
-  }
+/* --- Header --- */
+.game-header {
+  height: var(--header-h);
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  padding: 0 0.75rem;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  z-index: 10;
+}
 
-  .game-card:nth-child(2) { animation-delay: 0.1s; }
+.btn-icon {
+  background: rgba(255,255,255,0.08);
+  border: none;
+  color: var(--text-light);
+  border-radius: 7px;
+  padding: 0.3rem 0.5rem;
+  cursor: pointer;
+  font-size: 1.1rem;
+  transition: background 0.15s;
+}
+.btn-icon:active { background: rgba(255,255,255,0.18); }
 
-  .game-card::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: radial-gradient(ellipse at 50% 0%, rgba(240,165,0,0.08) 0%, transparent 60%);
-    pointer-events: none;
-  }
+.trump-display {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: rgba(0,0,0,0.3);
+  padding: 0.3rem 0.7rem;
+  border-radius: 20px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--gold-light);
+  border: 1px solid rgba(212,160,23,0.3);
+  flex-shrink: 0;
+}
+.trump-display .trump-label { color: var(--text-muted); font-weight: 400; }
+#trump-icon { font-size: 1.1rem; }
 
-  .game-card:hover, .game-card:active {
-    transform: translateY(-3px) scale(1.01);
-    border-color: var(--gold);
-    box-shadow: 0 12px 40px rgba(0,0,0,0.6), 0 0 20px rgba(240,165,0,0.15);
-  }
+.contract-display {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  flex: 1;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
-  .card-emblem {
-    font-size: 3.2rem;
-    text-align: center;
-    margin-bottom: 12px;
-    line-height: 1;
-  }
+.score-badges {
+  display: flex;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+.score-badge {
+  font-size: 0.75rem;
+  font-weight: 800;
+  padding: 0.2rem 0.5rem;
+  border-radius: 20px;
+}
+.score-badge.team-a { background: rgba(37,99,235,0.3); border: 1px solid rgba(37,99,235,0.6); color: #93c5fd; }
+.score-badge.team-b { background: rgba(220,38,38,0.3); border: 1px solid rgba(220,38,38,0.6); color: #fca5a5; }
 
-  .card-name {
-    font-size: 1.5rem;
-    font-weight: 800;
-    text-align: center;
-    color: var(--gold-light);
-    letter-spacing: 2px;
-    text-transform: uppercase;
-  }
+/* --- Table --- */
+.table-surface {
+  flex: 1;
+  position: relative;
+  background: radial-gradient(ellipse at 50% 50%, var(--felt) 0%, var(--felt-dark) 100%);
+  border: 6px solid var(--felt-border);
+  margin: 4px;
+  border-radius: 20px;
+  overflow: hidden;
+  min-height: 0;
+}
 
-  .card-dari {
-    text-align: center;
-    font-size: 1.1rem;
-    color: var(--text-muted);
-    margin-top: 2px;
-    font-style: italic;
-    direction: rtl;
-  }
+/* --- Status banner --- */
+.status-banner {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0,0,0,0.65);
+  color: var(--gold-light);
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 0.3rem 0.8rem;
+  border-radius: 20px;
+  text-align: center;
+  pointer-events: none;
+  z-index: 5;
+  white-space: nowrap;
+  max-width: 90%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
-  .card-desc {
-    text-align: center;
-    font-size: 0.82rem;
-    color: var(--text-muted);
-    margin-top: 10px;
-    line-height: 1.5;
-  }
+/* --- Player zones --- */
+.player-zone {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  z-index: 10;
+  transition: filter 0.2s;
+}
 
-  .card-suits {
-    display: flex;
-    justify-content: center;
-    gap: 8px;
-    font-size: 1.4rem;
-    margin-top: 14px;
-  }
-  .card-suits .red { color: var(--card-red); }
+.player-zone.active-turn .player-badge {
+  box-shadow: 0 0 0 2px var(--gold), 0 0 12px rgba(212,160,23,0.5);
+}
 
-  .card-badge {
-    display: inline-block;
-    background: rgba(240,165,0,0.15);
-    border: 1px solid rgba(240,165,0,0.35);
-    color: var(--gold-light);
-    font-size: 0.72rem;
-    font-weight: 700;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-    border-radius: 20px;
-    padding: 3px 10px;
-    margin-top: 12px;
-    align-self: center;
-  }
+.player-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: rgba(0,0,0,0.6);
+  border-radius: 20px;
+  padding: 0.25rem 0.6rem;
+  border: 1.5px solid rgba(255,255,255,0.1);
+  font-size: 0.75rem;
+}
+.player-badge .avatar { font-size: 1.1rem; }
+.player-badge .p-name { font-weight: 700; color: var(--text-light); max-width: 60px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.player-badge .p-score { color: var(--text-muted); font-size: 0.65rem; }
+.player-badge .team-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.team-dot.team-a { background: var(--team-a); }
+.team-dot.team-b { background: var(--team-b); }
 
-  .card-badge.online { background: rgba(34,197,94,0.15); border-color: rgba(34,197,94,0.4); color: #4ade80; }
+.player-bid-badge {
+  font-size: 0.7rem;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 10px;
+  text-align: center;
+}
+.player-bid-badge.active-bid { background: var(--gold); color: #1a1a1a; }
+.player-bid-badge.pass { background: rgba(255,255,255,0.15); color: var(--text-muted); }
 
-  .play-btn {
-    margin-top: 16px;
-    background: var(--gold);
-    color: #1a1a1a;
-    border: none;
-    border-radius: 10px;
-    padding: 12px 0;
-    font-size: 1rem;
-    font-weight: 800;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-    width: 100%;
-    cursor: pointer;
-    transition: background 0.15s;
-  }
+/* Position zones */
+.pos-north {
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  align-items: center;
+}
+.pos-south {
+  bottom: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  align-items: center;
+}
+.pos-west {
+  left: 4px;
+  top: 44%;
+  transform: translateY(-50%);
+  flex-direction: row;
+}
+.pos-east {
+  right: 4px;
+  top: 44%;
+  transform: translateY(-50%);
+  flex-direction: row-reverse;
+}
 
-  .play-btn:hover { background: var(--gold-light); }
+/* Bot hands */
+.bot-hand {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+  flex-shrink: 0;
+}
+.card-back {
+  width: 18px;
+  height: 28px;
+  background: linear-gradient(135deg, #1e40af, #1d4ed8);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 3px;
+  box-shadow: 1px 1px 3px rgba(0,0,0,0.5);
+  position: relative;
+}
+.card-back::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 2px;
+}
 
-  /* ── Footer ── */
-  .site-footer {
-    margin-top: 32px;
-    text-align: center;
-    color: var(--text-muted);
-    font-size: 0.75rem;
-    opacity: 0.6;
-  }
+.pos-west .bot-hand { flex-direction: column; }
+.pos-east .bot-hand { flex-direction: column; }
+.pos-west .card-back, .pos-east .card-back { width: 24px; height: 16px; }
 
-  /* ── Animations ── */
-  @keyframes fadeDown {
-    from { opacity: 0; transform: translateY(-16px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
+.card-count {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  text-align: center;
+}
 
-  @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(20px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
+/* --- Trick area --- */
+.trick-area {
+  position: absolute;
+  left: 50%;
+  top: 44%;
+  transform: translate(-50%, -50%);
+  width: 170px;
+  height: 160px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 15;
+}
 
-  /* Tablet: side-by-side */
-  @media (min-width: 560px) {
-    .games-grid {
-      grid-template-columns: 1fr 1fr;
-      max-width: 680px;
-    }
-  }
+.trick-slot {
+  position: absolute;
+  width: 50px;
+  height: 72px;
+  transition: transform 0.15s;
+}
+.trick-slot.pos-south { bottom: 0; left: 50%; transform: translateX(-50%); }
+.trick-slot.pos-north { top: 0;    left: 50%; transform: translateX(-50%); }
+.trick-slot.pos-west  { left: 0;   top: 50%;  transform: translateY(-50%); }
+.trick-slot.pos-east  { right: 0;  top: 50%;  transform: translateY(-50%); }
+
+.card-enter { opacity: 0; transform: scale(0.8) !important; }
+
+/* --- Card face --- */
+.card-face {
+  width: 100%;
+  height: 100%;
+  background: var(--card-bg);
+  border-radius: 6px;
+  box-shadow: 0 3px 8px var(--card-shadow);
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  padding: 2px 3px;
+  font-family: 'Georgia', serif;
+  position: relative;
+}
+.card-face.red { color: #c41e3a; }
+.card-face.black { color: #1a1a2e; }
+
+.card-corner {
+  display: flex;
+  flex-direction: column;
+  line-height: 1;
+}
+.card-corner.bottom-right {
+  align-self: end;
+  align-items: flex-end;
+  transform: rotate(180deg);
+}
+.card-corner .rank { font-size: 0.65rem; font-weight: 900; }
+.card-corner .suit { font-size: 0.55rem; }
+.card-center {
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* --- South's hand (human) --- */
+.hand-south {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  padding: 0;
+  flex-shrink: 0;
+  height: var(--footer-h);
+  overflow: visible;
+  position: relative;
+}
+
+.card-wrapper {
+  position: relative;
+  width: 52px;
+  height: 76px;
+  margin-left: -18px;
+  transition: transform 0.15s, margin 0.1s;
+  cursor: default;
+  flex-shrink: 0;
+}
+.card-wrapper:first-child { margin-left: 0; }
+
+.card-wrapper.legal {
+  cursor: pointer;
+  transform: translateY(0px);
+}
+.card-wrapper.legal:hover {
+  transform: translateY(-10px);
+  margin-left: -10px;
+  margin-right: 8px;
+  z-index: 20;
+}
+.card-wrapper.illegal { opacity: 0.45; cursor: not-allowed; }
+
+/* --- Trick count bar --- */
+.trick-count-bar {
+  position: absolute;
+  bottom: 1px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 0.5rem;
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  pointer-events: none;
+  z-index: 6;
+}
+
+/* ====================== BIDDING OVERLAY ====================== */
+#bid-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  background: rgba(0,0,0,0.3);
+  backdrop-filter: blur(2px);
+  padding-bottom: 10px;
+}
+
+.bid-panel {
+  width: 100%;
+  background: rgba(10,25,15,0.95);
+  border-top: 2px solid var(--gold);
+  padding: 0.75rem 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+#bid-status {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--gold-light);
+  text-align: center;
+}
+
+#bid-history {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  justify-content: center;
+  min-height: 22px;
+}
+.bid-entry {
+  display: flex;
+  gap: 4px;
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  border-radius: 10px;
+}
+.bid-entry.team-0 { background: rgba(37,99,235,0.25); border: 1px solid rgba(37,99,235,0.5); }
+.bid-entry.team-1 { background: rgba(220,38,38,0.25); border: 1px solid rgba(220,38,38,0.5); }
+.bid-name { color: var(--text-muted); }
+.bid-val  { font-weight: 800; color: var(--text-light); }
+
+#bid-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  justify-content: center;
+}
+
+.bid-btn {
+  padding: 0.5rem 0.9rem;
+  border: 2px solid var(--gold);
+  background: rgba(212,160,23,0.15);
+  color: var(--gold-light);
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 0.1s, transform 0.1s;
+  min-width: 48px;
+}
+.bid-btn:active { background: rgba(212,160,23,0.4); transform: scale(0.95); }
+.bid-btn.bid-pass { border-color: rgba(255,255,255,0.3); background: rgba(255,255,255,0.08); color: var(--text-muted); font-size: 0.85rem; }
+.bid-btn.bid-double13 { border-color: #f59e0b; background: rgba(245,158,11,0.2); color: #fde68a; font-size: 0.8rem; letter-spacing: -0.3px; }
+
+/* ====================== TOAST ====================== */
+#toast {
+  position: fixed;
+  bottom: 150px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(10,25,15,0.95);
+  color: var(--gold-light);
+  border: 1px solid var(--gold);
+  border-radius: 20px;
+  padding: 0.5rem 1.2rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  z-index: 999;
+  max-width: 90%;
+  text-align: center;
+  pointer-events: none;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+}
+
+/* ====================== MODALS ====================== */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: var(--overlay);
+  z-index: 200;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0.5rem;
+}
+
+.modal-dialog {
+  background: #0f1e14;
+  border: 1.5px solid var(--felt-border);
+  border-radius: 18px 18px 12px 12px;
+  width: 100%;
+  max-width: 420px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  flex-shrink: 0;
+}
+.modal-title { font-size: 1.1rem; font-weight: 800; color: var(--gold-light); }
+.btn-close {
+  background: none; border: none; color: var(--text-muted);
+  font-size: 1.3rem; cursor: pointer; padding: 0.1rem 0.4rem; border-radius: 5px;
+}
+.btn-close:hover { background: rgba(255,255,255,0.08); }
+
+.modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+  -webkit-overflow-scrolling: touch;
+}
+.modal-footer {
+  padding: 0.75rem 1rem;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+
+/* Online modal tabs */
+.online-tabs {
+  display: flex;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  flex-shrink: 0;
+}
+.online-tab-btn {
+  flex: 1;
+  padding: 0.65rem;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color 0.1s, border-color 0.1s;
+}
+.online-tab-btn.active { color: var(--gold-light); border-bottom-color: var(--gold); }
+
+/* Form elements */
+.form-group { margin-bottom: 1rem; }
+.form-label { display: block; font-weight: 700; color: #94a3b8; margin-bottom: 0.3rem; font-size: 0.85rem; }
+.form-control {
+  width: 100%;
+  padding: 0.6rem 0.8rem;
+  background: rgba(255,255,255,0.05);
+  border: 1.5px solid rgba(255,255,255,0.12);
+  border-radius: 8px;
+  color: var(--text-light);
+  font-size: 0.95rem;
+}
+.form-control:focus { outline: none; border-color: var(--gold); }
+.form-control-code { font-weight: 900; letter-spacing: 2px; color: var(--gold-light); font-size: 1rem; }
+
+.input-row { display: flex; gap: 0.5rem; }
+.input-row .form-control { flex: 1; }
+
+/* Buttons */
+.btn-primary {
+  padding: 0.65rem 1.2rem;
+  background: var(--gold);
+  color: #1a1a1a;
+  border: none;
+  border-radius: 8px;
+  font-weight: 800;
+  font-size: 0.95rem;
+  cursor: pointer;
+  width: 100%;
+  transition: filter 0.1s;
+}
+.btn-primary:hover { filter: brightness(1.1); }
+.btn-primary:active { filter: brightness(0.9); }
+
+.btn-secondary {
+  padding: 0.5rem 1rem;
+  background: rgba(255,255,255,0.08);
+  color: var(--text-light);
+  border: 1.5px solid rgba(255,255,255,0.15);
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.btn-icon-sm {
+  padding: 0.5rem 0.7rem;
+  background: rgba(255,255,255,0.08);
+  border: 1.5px solid rgba(255,255,255,0.12);
+  border-radius: 7px;
+  color: var(--text-light);
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+
+/* Lobby seats */
+.lobby-seats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+.lobby-seat {
+  padding: 0.65rem;
+  border-radius: 8px;
+  text-align: center;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.lobby-seat.filled { background: rgba(37,99,235,0.2); border: 1.5px solid rgba(37,99,235,0.5); color: #93c5fd; }
+.lobby-seat.empty  { background: rgba(255,255,255,0.05); border: 1.5px dashed rgba(255,255,255,0.15); color: var(--text-muted); }
+
+.lobby-team-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  letter-spacing: 1px;
+  margin-bottom: 0.3rem;
+  font-weight: 700;
+}
+.lobby-team-a .lobby-seat.filled { border-color: rgba(37,99,235,0.6); }
+.lobby-team-b .lobby-seat.filled { border-color: rgba(220,38,38,0.6); background: rgba(220,38,38,0.2); color: #fca5a5; }
+
+/* Scoreboard table */
+.scoreboard-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+.scoreboard-table th { text-align: center; padding: 0.4rem; color: var(--text-muted); border-bottom: 1px solid rgba(255,255,255,0.1); }
+.scoreboard-table td { text-align: center; padding: 0.4rem; border-bottom: 1px solid rgba(255,255,255,0.05); }
+
+/* Round end modal */
+.round-result-box {
+  text-align: center;
+  padding: 1rem;
+}
+.round-result-title { font-size: 1.5rem; font-weight: 900; margin-bottom: 0.5rem; }
+.round-result-title.made { color: #4ade80; }
+.round-result-title.failed { color: #f87171; }
+
+/* Rules */
+.rules-section { margin-bottom: 1rem; }
+.rules-section h3 { color: var(--gold-light); font-size: 0.95rem; margin-bottom: 0.4rem; }
+.rules-section p, .rules-section li { font-size: 0.85rem; color: rgba(255,255,255,0.75); line-height: 1.6; }
+.rules-section ul { margin-left: 1rem; }
+
+/* Menu grid */
+.menu-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}
+.menu-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.9rem;
+  background: rgba(255,255,255,0.06);
+  border: 1.5px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-light);
+  transition: background 0.1s;
+}
+.menu-card:active { background: rgba(255,255,255,0.12); }
+.menu-card .menu-icon { font-size: 1.5rem; }
+
+/* ====================== RESPONSIVE ====================== */
+@media (max-width: 400px) {
+  .card-wrapper { width: 46px; height: 68px; margin-left: -16px; }
+  .trick-slot { width: 44px; height: 64px; }
+  .bid-btn { padding: 0.4rem 0.65rem; font-size: 0.9rem; min-width: 42px; }
+}
+
+@media (min-width: 500px) {
+  .modal-backdrop { align-items: center; }
+  .modal-dialog { border-radius: 18px; }
+  .hand-south { --footer-h: 140px; }
+  .card-wrapper { width: 58px; height: 84px; margin-left: -20px; }
+}
+
 </style>
 </head>
 <body>
 
-<header class="site-header">
-  <div class="site-logo">Ingeni<span>uzz</span></div>
-  <div class="suits-row">
-    <span class="red">♥</span> ♠ <span class="red">♦</span> ♣
-  </div>
-  <div class="site-tagline">Afghan Card Games — بازی‌های کارتی</div>
-</header>
-
-<div class="games-grid">
-
-  <!-- Qalbaka / Hearts -->
-  <div class="game-card" onclick="location.href='./hearts/'">
-    <div class="card-emblem">♥</div>
-    <div class="card-name">Qalbaka</div>
-    <div class="card-dari">قلبکه</div>
-    <div class="card-suits">
-      <span class="red">♥</span>
-      <span class="red">♦</span>
-      <span>♠</span>
-      <span>♣</span>
+<!-- ====================================================================
+     MAIN MENU SCREEN
+     ==================================================================== -->
+<div id="screen-main" class="screen">
+    <div class="main-logo">
+        <div class="suit-row">♠ ♥ ♦ ♣</div>
+        <div class="game-title">TEKKA</div>
+        <div class="game-subtitle">تیکه • Afghan Partnership Card Game</div>
     </div>
-    <div class="card-desc">
-      Classic Hearts — avoid point cards &amp; shoot the moon.<br>
-      Play solo vs AI or online with friends.
-    </div>
-    <span class="card-badge online">🌐 Online Multiplayer</span>
-    <div class="play-btn">Play Now</div>
-  </div>
 
-  <!-- Tekka -->
-  <div class="game-card" onclick="location.href='./tekka/'">
-    <div class="card-emblem">♠</div>
-    <div class="card-name">Tekka</div>
-    <div class="card-dari">تیکه</div>
-    <div class="card-suits">
-      <span>♠</span>
-      <span class="red">♦</span>
-      <span>♣</span>
-      <span class="red">♥</span>
+    <div class="main-menu-buttons">
+        <button id="btn-new-game" class="btn-menu-main primary">🃏 New Game</button>
+        <button id="btn-online"   class="btn-menu-main online">🌐 Online with Friends</button>
+        <button id="btn-rules"    class="btn-menu-main secondary">📖 Rules</button>
+        <button id="btn-scoreboard" class="btn-menu-main secondary">📊 Scoreboard</button>
+        <button id="btn-settings"  class="btn-menu-main secondary">⚙ Settings</button>
+        <a href="../" class="btn-menu-main secondary" style="text-decoration:none; justify-content:center;">← Back to Games</a>
     </div>
-    <div class="card-desc">
-      Afghan partnership trump game — 2v2, bid to win tricks.<br>
-      Play vs AI bots or online with a partner.
-    </div>
-    <span class="card-badge online">🌐 Online Multiplayer</span>
-    <div class="play-btn">Play Now</div>
-  </div>
-
 </div>
 
-<footer class="site-footer">
-  &copy; 2025 Ingeniuzz &mdash; Made with ♥ for the Afghan community
-</footer>
+<!-- ====================================================================
+     GAME SCREEN
+     ==================================================================== -->
+<div id="screen-game" class="screen hidden">
+
+    <!-- Header -->
+    <header class="game-header">
+        <button id="btn-game-menu" class="btn-icon" title="Menu">☰</button>
+
+        <div class="trump-display">
+            <span class="trump-label">Trump:</span>
+            <span id="trump-icon"></span>
+            <span id="trump-suit">TBD</span>
+        </div>
+
+        <div class="contract-display" id="contract-info"></div>
+
+        <div class="score-badges">
+            <span id="score-team-a" class="score-badge team-a">N/S: 0</span>
+            <span id="score-team-b" class="score-badge team-b">W/E: 0</span>
+        </div>
+    </header>
+
+    <!-- Table -->
+    <div class="table-surface">
+
+        <!-- Status message -->
+        <div id="status-msg" class="status-banner">Welcome to Tekka!</div>
+
+        <!-- Trick count -->
+        <div class="trick-count-bar" id="trick-count"></div>
+
+        <!-- Center trick area -->
+        <div id="trick-area" class="trick-area"></div>
+
+        <!-- Player: North (partner) -->
+        <div id="player-north" class="player-zone pos-north">
+            <div class="player-badge">
+                <span class="team-dot team-a"></span>
+                <span class="avatar">🤖</span>
+                <div>
+                    <div class="p-name">North Bot</div>
+                    <div class="p-score">Tricks: <span id="tricks-2">0</span></div>
+                </div>
+            </div>
+            <div id="player-bid-2" class="player-bid-badge hidden"></div>
+            <div class="bot-hand" id="hand-north"></div>
+            <span class="card-count" id="count-north"></span>
+        </div>
+
+        <!-- Player: West (opponent) -->
+        <div id="player-west" class="player-zone pos-west">
+            <div class="player-badge">
+                <span class="team-dot team-b"></span>
+                <span class="avatar">🤖</span>
+                <div>
+                    <div class="p-name">West Bot</div>
+                    <div class="p-score">Tricks: <span id="tricks-1">0</span></div>
+                </div>
+            </div>
+            <div id="player-bid-1" class="player-bid-badge hidden"></div>
+            <div class="bot-hand" id="hand-west"></div>
+        </div>
+
+        <!-- Player: East (opponent) -->
+        <div id="player-east" class="player-zone pos-east">
+            <div class="player-badge">
+                <span class="team-dot team-b"></span>
+                <span class="avatar">🤖</span>
+                <div>
+                    <div class="p-name">East Bot</div>
+                    <div class="p-score">Tricks: <span id="tricks-3">0</span></div>
+                </div>
+            </div>
+            <div id="player-bid-3" class="player-bid-badge hidden"></div>
+            <div class="bot-hand" id="hand-east"></div>
+        </div>
+
+        <!-- Player: South (Human) -->
+        <div id="player-south" class="player-zone pos-south">
+            <div id="player-bid-0" class="player-bid-badge hidden"></div>
+            <div class="player-badge">
+                <span class="team-dot team-a"></span>
+                <span class="avatar">🧑‍💼</span>
+                <div>
+                    <div class="p-name">You</div>
+                    <div class="p-score">Tricks: <span id="tricks-0">0</span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- BIDDING OVERLAY -->
+        <div id="bid-overlay" class="hidden">
+            <div class="bid-panel">
+                <div id="bid-status">Waiting for bids...</div>
+                <div id="bid-history"></div>
+                <div id="bid-buttons" class="hidden"></div>
+            </div>
+        </div>
+
+    </div><!-- /table-surface -->
+
+    <!-- South's hand -->
+    <div id="hand-south" class="hand-south"></div>
+
+</div><!-- /screen-game -->
+
+<!-- ====================================================================
+     MODALS
+     ==================================================================== -->
+
+<!-- Game Menu Modal -->
+<div id="modal-menu" class="modal-backdrop hidden">
+    <div class="modal-dialog">
+        <div class="modal-header">
+            <span class="modal-title">♣ Game Menu</span>
+            <button class="btn-close" data-close="modal-menu">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="menu-grid">
+                <button id="menu-new-game"   class="menu-card"><span class="menu-icon">🃏</span>New Game</button>
+                <button id="menu-online"     class="menu-card"><span class="menu-icon">🌐</span>Online</button>
+                <button id="menu-scoreboard" class="menu-card"><span class="menu-icon">📊</span>Scoreboard</button>
+                <button id="menu-rules"      class="menu-card"><span class="menu-icon">📖</span>Rules</button>
+                <button id="menu-settings"   class="menu-card"><span class="menu-icon">⚙</span>Settings</button>
+                <a href="../" class="menu-card" style="text-decoration:none;"><span class="menu-icon">🏠</span>Home</a>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-secondary" data-close="modal-menu">Resume Game ▶</button>
+        </div>
+    </div>
+</div>
+
+<!-- Online Multiplayer Modal -->
+<div id="modal-online" class="modal-backdrop hidden">
+    <div class="modal-dialog">
+        <div class="modal-header">
+            <span class="modal-title">🌐 Online Multiplayer</span>
+            <button class="btn-close" data-close="modal-online">&times;</button>
+        </div>
+        <div class="online-tabs">
+            <button id="tab-create" class="online-tab-btn active">Create Room</button>
+            <button id="tab-join"   class="online-tab-btn">Join Room</button>
+            <button id="tab-lobby"  class="online-tab-btn hidden">Lobby</button>
+        </div>
+        <div class="modal-body">
+
+            <!-- Create Room View -->
+            <div id="view-create">
+                <div class="form-group">
+                    <label class="form-label">Your Name</label>
+                    <input id="create-player-name" class="form-control" type="text" value="Host" maxlength="16">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Room Code</label>
+                    <div class="input-row">
+                        <input id="create-room-code" class="form-control form-control-code" type="text" maxlength="12" placeholder="TEKKA-XXXX">
+                        <button id="btn-regen-code" class="btn-icon-sm" title="New code">🎲</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Room Password (Required)</label>
+                    <div class="input-row">
+                        <input id="create-room-pwd" class="form-control" type="password" value="1234" maxlength="16">
+                        <button id="btn-toggle-create-pwd" class="btn-icon-sm">👁️</button>
+                    </div>
+                </div>
+                <button id="btn-create-room" class="btn-primary">Create Room & Open Lobby</button>
+            </div>
+
+            <!-- Join Room View -->
+            <div id="view-join" class="hidden">
+                <div class="form-group">
+                    <label class="form-label">Your Name</label>
+                    <input id="join-player-name" class="form-control" type="text" placeholder="Enter your name…" maxlength="16" style="border-color:#2563eb;">
+                    <small style="color:#2563eb;font-size:0.78rem;margin-top:3px;display:block;">Friends will see this name in the game</small>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Room Code</label>
+                    <input id="join-room-code" class="form-control form-control-code" type="text" maxlength="12" placeholder="TEKKA-XXXX">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Room Password</label>
+                    <div class="input-row">
+                        <input id="join-room-pwd" class="form-control" type="password" maxlength="16" placeholder="Room password">
+                        <button id="btn-toggle-join-pwd" class="btn-icon-sm">👁️</button>
+                    </div>
+                </div>
+                <button id="btn-join-room" class="btn-primary">Connect & Join Room</button>
+            </div>
+
+            <!-- Lobby View -->
+            <div id="view-lobby" class="hidden">
+                <div class="form-group">
+                    <label class="form-label">Room Code</label>
+                    <div id="lobby-room-code" style="font-size:1.3rem;font-weight:900;color:var(--gold-light);letter-spacing:2px;"></div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Invite Link</label>
+                    <div class="input-row">
+                        <input id="lobby-invite-link" class="form-control" type="text" readonly style="font-size:0.75rem;">
+                        <button id="btn-copy-link" class="btn-icon-sm">📋</button>
+                    </div>
+                </div>
+
+                <!-- Team A: N/S -->
+                <div class="lobby-team-a" style="margin-bottom:0.75rem;">
+                    <div class="lobby-team-label" style="color:#93c5fd;">🔵 Team N/S (Your Team)</div>
+                    <div class="lobby-seats">
+                        <div id="lobby-seat-0" class="lobby-seat filled">You (South)</div>
+                        <div id="lobby-seat-2" class="lobby-seat empty">Waiting...</div>
+                    </div>
+                </div>
+                <!-- Team B: W/E -->
+                <div class="lobby-team-b">
+                    <div class="lobby-team-label" style="color:#fca5a5;">🔴 Team W/E (Opponents)</div>
+                    <div class="lobby-seats">
+                        <div id="lobby-seat-1" class="lobby-seat empty">Waiting...</div>
+                        <div id="lobby-seat-3" class="lobby-seat empty">Waiting...</div>
+                    </div>
+                </div>
+
+                <div id="lobby-status" style="margin-top:0.75rem;font-size:0.82rem;color:var(--text-muted);text-align:center;">Waiting for players to join...</div>
+
+                <button id="btn-start-online" class="btn-primary hidden" style="margin-top:0.75rem;">🚀 Start Game</button>
+                <button id="btn-leave-lobby" class="btn-secondary" style="margin-top:0.5rem;width:100%;text-align:center;">Leave Room</button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- Round End Modal -->
+<div id="modal-round-end" class="modal-backdrop hidden">
+    <div class="modal-dialog">
+        <div class="modal-header">
+            <span class="modal-title">Round Complete</span>
+        </div>
+        <div class="modal-body">
+            <div class="round-result-box">
+                <div id="round-result-title" class="round-result-title"></div>
+                <div id="round-result-detail" style="font-size:0.9rem;color:rgba(255,255,255,0.75);line-height:1.7;margin:0.75rem 0;"></div>
+                <div id="round-scores" style="font-size:1rem;font-weight:700;color:var(--gold-light);"></div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button id="btn-next-hand" class="btn-primary" style="width:100%;">Next Hand →</button>
+        </div>
+    </div>
+</div>
+
+<!-- Game Over Modal -->
+<div id="modal-game-over" class="modal-backdrop hidden">
+    <div class="modal-dialog">
+        <div class="modal-header">
+            <span class="modal-title">Game Over!</span>
+        </div>
+        <div class="modal-body" style="text-align:center;padding:2rem 1rem;">
+            <div id="gameover-title" style="font-size:2rem;font-weight:900;margin-bottom:1rem;"></div>
+            <div id="gameover-scores" style="font-size:1.1rem;color:var(--gold-light);"></div>
+        </div>
+        <div class="modal-footer">
+            <button id="btn-play-again" class="btn-primary" style="width:100%;">Play Again</button>
+        </div>
+    </div>
+</div>
+
+<!-- Scoreboard Modal -->
+<div id="modal-scoreboard" class="modal-backdrop hidden">
+    <div class="modal-dialog">
+        <div class="modal-header">
+            <span class="modal-title">📊 Scoreboard</span>
+            <button class="btn-close" data-close="modal-scoreboard">&times;</button>
+        </div>
+        <div class="modal-body">
+            <table class="scoreboard-table">
+                <thead>
+                    <tr>
+                        <th>#</th><th>Declarant</th><th>Bid</th>
+                        <th>Tricks</th><th>Made</th>
+                        <th style="color:#93c5fd;">N/S</th>
+                        <th style="color:#fca5a5;">W/E</th>
+                    </tr>
+                </thead>
+                <tbody id="scoreboard-body"></tbody>
+            </table>
+            <div style="margin-top:1rem;text-align:center;font-size:0.8rem;color:var(--text-muted);">Target: 104 points</div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-secondary" data-close="modal-scoreboard">Close</button>
+        </div>
+    </div>
+</div>
+
+<!-- Rules Modal -->
+<div id="modal-rules" class="modal-backdrop hidden">
+    <div class="modal-dialog">
+        <div class="modal-header">
+            <span class="modal-title">📖 How to Play Tekka</span>
+            <button class="btn-close" data-close="modal-rules">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="rules-section">
+                <h3>Overview</h3>
+                <p>Tekka (تیکه) is Afghanistan's most popular card game. 4 players in 2 partnerships (N/S vs W/E) using a standard 52-card deck. Play goes <strong>counter-clockwise</strong>.</p>
+            </div>
+            <div class="rules-section">
+                <h3>Bidding</h3>
+                <ul>
+                    <li>Starting from the dealer's right (CCW), each player bids <strong>once</strong>.</li>
+                    <li>Legal bids: <strong>8, 9, 10, 11, 12, 13</strong> or <strong>Double 13</strong> (play alone). Each bid must be higher than the last.</li>
+                    <li>You may also <strong>Pass</strong>.</li>
+                    <li>If everyone passes, the last bidder must bid <strong>8</strong>.</li>
+                </ul>
+            </div>
+            <div class="rules-section">
+                <h3>Trump Selection</h3>
+                <p>The <strong>highest bidder (Declarant)</strong> wins and must lead the first card. <strong>That card's suit becomes trump</strong> for the entire hand.</p>
+            </div>
+            <div class="rules-section">
+                <h3>Playing Tricks</h3>
+                <ul>
+                    <li>Follow suit if you can. If void, play any card.</li>
+                    <li>Highest trump wins the trick, otherwise highest card of the led suit wins.</li>
+                    <li>Trick winner leads the next trick.</li>
+                </ul>
+            </div>
+            <div class="rules-section">
+                <h3>Scoring (Target: 104 pts)</h3>
+                <ul>
+                    <li><strong>Bid made:</strong> Declarant's team scores the bid amount (e.g., bid 9 → +9 pts).</li>
+                    <li><strong>Bid failed:</strong> Opponents score <strong>2×</strong> the bid (e.g., bid 9 fails → +18 pts to opponents).</li>
+                    <li><strong>Double 13 made:</strong> +26 pts. <strong>Failed:</strong> Opponents get +52 pts!</li>
+                </ul>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-secondary" data-close="modal-rules">Got it!</button>
+        </div>
+    </div>
+</div>
+
+<!-- Settings Modal -->
+<div id="modal-settings" class="modal-backdrop hidden">
+    <div class="modal-dialog">
+        <div class="modal-header">
+            <span class="modal-title">⚙ Settings</span>
+            <button class="btn-close" data-close="modal-settings">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label class="form-label">Table Theme</label>
+                <select id="setting-theme" class="form-control">
+                    <option value="green">Classic Casino Green</option>
+                    <option value="navy">Midnight Navy</option>
+                    <option value="crimson">Royal Crimson</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Bot Difficulty</label>
+                <select id="setting-difficulty" class="form-control">
+                    <option value="easy">Casual</option>
+                    <option value="medium">Intermediate</option>
+                    <option value="hard" selected>Expert</option>
+                </select>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-primary" data-close="modal-settings" style="width:auto;">Save & Close</button>
+        </div>
+    </div>
+</div>
+
+<!-- Toast notification -->
+<div id="toast" class="hidden"></div>
+
+<!-- MQTT -->
+<script src="https://unpkg.com/mqtt@5.3.5/dist/mqtt.min.js"></script>
+<script>if (typeof mqtt === 'undefined') { document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.3.5/mqtt.min.js"><\/script>'); }</script>
+
+<!-- Game scripts -->
+<script>
+
+/* === cards.js === */
+/* === Tekka Card Game: cards.js === */
+'use strict';
+
+const SUITS = ['clubs', 'diamonds', 'hearts', 'spades'];
+const RANKS = ['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
+const RANK_VALUES = { '2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,'J':11,'Q':12,'K':13,'A':14 };
+const SUIT_SYMBOLS = { clubs:'♣', diamonds:'♦', hearts:'♥', spades:'♠' };
+const SUIT_NAMES = { clubs:'Clubs', diamonds:'Diamonds', hearts:'Hearts', spades:'Spades' };
+const SUIT_COLORS = { clubs:'#1a1a2e', diamonds:'#c41e3a', hearts:'#c41e3a', spades:'#1a1a2e' };
+
+class Card {
+    constructor(suit, rank) {
+        this.suit = suit;
+        this.rank = rank;
+        this.id = `${rank}-${suit}`;
+        this.value = RANK_VALUES[rank];
+    }
+    get symbol() { return SUIT_SYMBOLS[this.suit]; }
+    get suitName() { return SUIT_NAMES[this.suit]; }
+    get color() { return SUIT_COLORS[this.suit]; }
+    get isRed() { return this.suit === 'hearts' || this.suit === 'diamonds'; }
+    get isHonor() { return ['A','K','Q','J'].includes(this.rank); }
+    get displayRank() { return this.rank; }
+    toString() { return `${this.rank}${this.symbol}`; }
+}
+
+class Deck {
+    constructor() {
+        this.cards = [];
+        for (const suit of SUITS) {
+            for (const rank of RANKS) {
+                this.cards.push(new Card(suit, rank));
+            }
+        }
+    }
+
+    shuffle() {
+        for (let i = this.cards.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [this.cards[i], this.cards[j]] = [this.cards[j], this.cards[i]];
+        }
+        return this;
+    }
+
+    // Deal counter-clockwise starting from player after dealer
+    deal(numPlayers = 4) {
+        const hands = Array.from({ length: numPlayers }, () => []);
+        for (let i = 0; i < this.cards.length; i++) {
+            hands[i % numPlayers].push(this.cards[i]);
+        }
+        return hands;
+    }
+}
+
+// Sort hand: trump first (high→low), then other suits
+function sortHand(hand, trump = null) {
+    const suitOrder = trump
+        ? [trump, ...SUITS.filter(s => s !== trump)]
+        : SUITS;
+
+    return [...hand].sort((a, b) => {
+        const ai = suitOrder.indexOf(a.suit);
+        const bi = suitOrder.indexOf(b.suit);
+        if (ai !== bi) return ai - bi;
+        return b.value - a.value;
+    });
+}
+
+// Reconstruct Card objects from plain data (for network/serialization)
+function deserializeCard(data) {
+    if (data instanceof Card) return data;
+    return new Card(data.suit, data.rank);
+}
+
+function deserializeHand(handData) {
+    return handData.map(deserializeCard);
+}
+
+/* === rules.js === */
+/* === Tekka Card Game: rules.js === */
+'use strict';
+
+// Seat indices (counter-clockwise layout)
+const SEAT = { SOUTH: 0, WEST: 1, NORTH: 2, EAST: 3 };
+const SEAT_NAMES = ['South', 'West', 'North', 'East'];
+const SEAT_POSITIONS = ['pos-south', 'pos-west', 'pos-north', 'pos-east'];
+
+// Teams: South(0)+North(2) vs West(1)+East(3)
+const TEAMS = [[SEAT.SOUTH, SEAT.NORTH], [SEAT.WEST, SEAT.EAST]];
+
+// Game phases
+const PHASE = {
+    IDLE: 'IDLE',
+    DEALING: 'DEALING',
+    BIDDING: 'BIDDING',
+    TRUMP_LEAD: 'TRUMP_LEAD',   // Declarant must lead first card (reveals trump)
+    PLAYING: 'PLAYING',
+    ROUND_END: 'ROUND_END',
+    GAME_OVER: 'GAME_OVER',
+    ALL_PASS: 'ALL_PASS'        // Everyone passed, redeal
+};
+
+const BID = {
+    PASS: 'pass',
+    DOUBLE13: 'double13'
+};
+
+const TARGET_SCORE = 104;
+const TOTAL_TRICKS = 13;
+const MIN_BID = 8;
+const MAX_BID = 13;
+
+const TekkaRules = {
+
+    // Counter-clockwise next player: South→East→North→West→South
+    // Indices: 0→3→2→1→0
+    ccwNext(i) { return (i + 3) % 4; },
+
+    // Team index for a player (0 = South+North, 1 = West+East)
+    teamOf(playerIndex) {
+        return TEAMS[0].includes(playerIndex) ? 0 : 1;
+    },
+
+    // Partner index
+    partnerOf(playerIndex) {
+        return playerIndex % 2 === 0 ? playerIndex + 2 : playerIndex - 2;
+        // 0↔2, 1↔3
+    },
+
+    // First bidder is to the right of the dealer (in CCW direction)
+    // CCW: so "dealer's right" = the seat that plays AFTER the dealer in CCW
+    firstBidder(dealerIndex) {
+        return this.ccwNext(dealerIndex);
+    },
+
+    // Bidding order: 4 players, each bids once, starting from firstBidder
+    biddingOrder(dealerIndex) {
+        const start = this.firstBidder(dealerIndex);
+        const order = [];
+        let cur = start;
+        for (let i = 0; i < 4; i++) {
+            order.push(cur);
+            cur = this.ccwNext(cur);
+        }
+        return order;
+    },
+
+    // Returns true if newBid is strictly higher than currentBid
+    isHigherBid(newBid, currentBid) {
+        if (currentBid === null || currentBid === BID.PASS) return true;
+        if (newBid === BID.PASS) return false;
+        if (newBid === BID.DOUBLE13) return currentBid !== BID.DOUBLE13;
+        if (currentBid === BID.DOUBLE13) return false;
+        return Number(newBid) > Number(currentBid);
+    },
+
+    // Legal bid amounts given the current highest bid
+    legalBids(currentHighBid) {
+        const legal = [];
+        for (let n = MIN_BID; n <= MAX_BID; n++) {
+            if (this.isHigherBid(n, currentHighBid)) legal.push(n);
+        }
+        if (this.isHigherBid(BID.DOUBLE13, currentHighBid)) legal.push(BID.DOUBLE13);
+        legal.push(BID.PASS);
+        return legal;
+    },
+
+    // Determine which cards are legal to play
+    legalCards(hand, trick, trump) {
+        if (!trick || trick.length === 0) {
+            // Leading: any card
+            return [...hand];
+        }
+        const ledSuit = trick[0].card.suit;
+        const sameSuit = hand.filter(c => c.suit === ledSuit);
+        return sameSuit.length > 0 ? sameSuit : [...hand];
+    },
+
+    // Determine winner of a completed trick
+    trickWinner(trick, trump) {
+        // trick = [{card: Card, playerIndex: number}, ...]
+        const ledSuit = trick[0].card.suit;
+        let winner = trick[0];
+
+        for (let i = 1; i < trick.length; i++) {
+            const entry = trick[i];
+            const isTrump = entry.card.suit === trump;
+            const winnerIsTrump = winner.card.suit === trump;
+
+            if (isTrump && !winnerIsTrump) {
+                winner = entry;
+            } else if (isTrump && winnerIsTrump) {
+                if (entry.card.value > winner.card.value) winner = entry;
+            } else if (!isTrump && !winnerIsTrump) {
+                if (entry.card.suit === ledSuit && entry.card.value > winner.card.value) {
+                    winner = entry;
+                }
+            }
+        }
+        return winner.playerIndex;
+    },
+
+    // Calculate round result
+    // forcedEight: last bidder had to bid 8 because all previous passed
+    calculateRoundScore(contractAmount, contractType, declarantTeam, teamTricks, forcedEight = false) {
+        const declarantTricks = teamTricks[declarantTeam];
+        const defenderTeam = 1 - declarantTeam;
+
+        const made = contractType === BID.DOUBLE13
+            ? declarantTricks === TOTAL_TRICKS
+            : declarantTricks >= Number(contractAmount);
+
+        if (made) {
+            const pts = contractType === BID.DOUBLE13 ? 26 : Number(contractAmount);
+            return {
+                made: true,
+                declarantTeam,
+                declarantPoints: pts,
+                defenderPoints: 0,
+                tricksTaken: declarantTricks
+            };
+        } else {
+            let defPts;
+            if (contractType === BID.DOUBLE13) {
+                defPts = 52;
+            } else if (forcedEight && Number(contractAmount) === 8) {
+                defPts = 8; // Special rule: last-forced 8 bid → only 8 pts to defenders
+            } else {
+                defPts = Number(contractAmount) * 2;
+            }
+            return {
+                made: false,
+                declarantTeam,
+                declarantPoints: 0,
+                defenderPoints: defPts,
+                tricksTaken: declarantTricks
+            };
+        }
+    },
+
+    // Check if a hand is a valid misdeal (no honors)
+    isMisdeal(hand) {
+        return !hand.some(c => c.isHonor);
+    },
+
+    // Count hand strength (for AI and display)
+    handStrength(hand) {
+        let pts = 0;
+        const suitLengths = { clubs: 0, diamonds: 0, hearts: 0, spades: 0 };
+        for (const c of hand) {
+            if (c.rank === 'A') pts += 4;
+            else if (c.rank === 'K') pts += 3;
+            else if (c.rank === 'Q') pts += 2;
+            else if (c.rank === 'J') pts += 1;
+            suitLengths[c.suit]++;
+        }
+        // Bonus for long suits (potential trump)
+        for (const suit of SUITS) {
+            if (suitLengths[suit] >= 5) pts += 1;
+            if (suitLengths[suit] >= 6) pts += 1;
+            if (suitLengths[suit] >= 7) pts += 2;
+        }
+        return { pts, suitLengths };
+    }
+};
+
+/* === ai.js === */
+/* === Tekka Card Game: ai.js === */
+'use strict';
+
+class TekkaAI {
+
+    // -------------------------------------------------------------------------
+    // BIDDING
+    // -------------------------------------------------------------------------
+
+    /**
+     * Decide what this bot should bid given:
+     * - hand: Card[] (this bot's hand)
+     * - currentHighBid: number | 'double13' | null (highest bid so far)
+     * - biddingPosition: 0=first, 1=second, 2=third, 3=last bidder
+     * - partnerBid: number | 'pass' | null (partner's bid if already made)
+     * - difficulty: 'easy' | 'medium' | 'hard'
+     * Returns: number | 'double13' | 'pass'
+     */
+    static decideBid(hand, currentHighBid, biddingPosition, partnerBid, difficulty = 'hard') {
+        const { pts, suitLengths } = TekkaRules.handStrength(hand);
+
+        // Best suit for trump (longest + highest value)
+        const bestSuit = this._bestTrumpSuit(hand, suitLengths);
+        const bestSuitCards = hand.filter(c => c.suit === bestSuit);
+        const bestSuitHighCards = bestSuitCards.filter(c => c.value >= 11).length; // J+
+
+        // Estimate how many tricks we can win
+        let estimatedTricks = this._estimateTricks(pts, bestSuit, suitLengths, hand);
+
+        // If partner already made a good bid, reduce expectations (they'll cover some)
+        if (partnerBid && partnerBid !== BID.PASS && partnerBid !== null) {
+            const partnerEstimate = Number(partnerBid) - 4;
+            // Don't double-count with partner
+            estimatedTricks = Math.max(estimatedTricks - 2, estimatedTricks * 0.6);
+        }
+
+        // Add randomness based on difficulty
+        const noise = difficulty === 'easy' ? (Math.random() - 0.5) * 2 :
+                      difficulty === 'medium' ? (Math.random() - 0.5) * 1 : 0;
+        estimatedTricks = Math.round(estimatedTricks + noise);
+
+        // Determine bid
+        let targetBid = Math.min(Math.max(estimatedTricks, MIN_BID), MAX_BID);
+
+        // Check if Double 13 makes sense (very strong hand)
+        if (pts >= 22 && bestSuitCards.length >= 7 && bestSuitHighCards >= 4 &&
+            difficulty === 'hard' && !partnerBid) {
+            if (TekkaRules.isHigherBid(BID.DOUBLE13, currentHighBid)) {
+                return BID.DOUBLE13;
+            }
+        }
+
+        // Find highest legal bid up to target
+        let chosenBid = BID.PASS;
+        for (let n = MIN_BID; n <= targetBid; n++) {
+            if (TekkaRules.isHigherBid(n, currentHighBid)) {
+                chosenBid = n;
+            }
+        }
+
+        // Last bidder special: if all others passed and we must bid 8
+        if (biddingPosition === 3 && currentHighBid === null && chosenBid === BID.PASS) {
+            // Forced bid of 8 — this is handled in game.js
+            return BID.PASS;
+        }
+
+        return chosenBid;
+    }
+
+    static _bestTrumpSuit(hand, suitLengths) {
+        let best = SUITS[0];
+        let bestScore = -1;
+        for (const suit of SUITS) {
+            const cards = hand.filter(c => c.suit === suit);
+            const len = cards.length;
+            const highCards = cards.filter(c => c.value >= 11).length;
+            const score = len * 2 + highCards * 3;
+            if (score > bestScore) {
+                bestScore = score;
+                best = suit;
+            }
+        }
+        return best;
+    }
+
+    static _estimateTricks(pts, bestSuit, suitLengths, hand) {
+        // Base from honor points
+        let tricks = 4 + Math.floor(pts / 3);
+
+        // Trump length bonus
+        const trumpLen = suitLengths[bestSuit];
+        if (trumpLen >= 5) tricks += 1;
+        if (trumpLen >= 6) tricks += 1;
+        if (trumpLen >= 7) tricks += 2;
+
+        // Void/singleton bonus
+        for (const suit of SUITS) {
+            if (suit === bestSuit) continue;
+            if (suitLengths[suit] === 0) tricks += 1; // void, can trump
+            if (suitLengths[suit] === 1) tricks += 0.5;
+        }
+
+        return Math.round(tricks);
+    }
+
+    // -------------------------------------------------------------------------
+    // TRUMP SELECTION (declarant leading first card)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Choose which card to lead as trump-revealer (declarant's first play).
+     * Best strategy: lead highest trump card to establish the suit.
+     */
+    static chooseTrumpLead(hand, difficulty = 'hard') {
+        const { suitLengths } = TekkaRules.handStrength(hand);
+        const bestSuit = this._bestTrumpSuit(hand, suitLengths);
+        const trumpCards = hand.filter(c => c.suit === bestSuit);
+
+        // Lead the highest trump card to establish dominance
+        trumpCards.sort((a, b) => b.value - a.value);
+        return trumpCards[0];
+    }
+
+    // -------------------------------------------------------------------------
+    // CARD PLAY
+    // -------------------------------------------------------------------------
+
+    /**
+     * Choose a card to play given the game state.
+     * @param {Card[]} hand - bot's current hand
+     * @param {object[]} trick - current trick [{card, playerIndex}, ...]
+     * @param {string} trump - trump suit
+     * @param {number} botIndex - this bot's seat index
+     * @param {object} gameState - full game state for context
+     * @param {string} difficulty
+     */
+    static chooseCard(hand, trick, trump, botIndex, gameState, difficulty = 'hard') {
+        const legal = TekkaRules.legalCards(hand, trick, trump);
+        if (legal.length === 1) return legal[0];
+
+        const isDeclarant = TekkaRules.teamOf(botIndex) === gameState.declarantTeam;
+        const isLeading = !trick || trick.length === 0;
+
+        if (isDeclarant) {
+            return this._playAsDeclarant(legal, trick, trump, botIndex, gameState, difficulty);
+        } else {
+            return this._playAsDefender(legal, trick, trump, botIndex, gameState, difficulty);
+        }
+    }
+
+    // --- Declarant strategy: win as many tricks as possible ---
+    static _playAsDeclarant(legal, trick, trump, botIndex, gameState, difficulty) {
+        const isLeading = !trick || trick.length === 0;
+
+        if (isLeading) {
+            // Lead: play highest trump to draw out opponent trumps, or highest card in long suit
+            const trumpCards = legal.filter(c => c.suit === trump);
+            if (trumpCards.length > 0 && difficulty !== 'easy') {
+                trumpCards.sort((a, b) => b.value - a.value);
+                return trumpCards[0];
+            }
+            // Lead highest card
+            return this._highestCard(legal);
+        }
+
+        // Following: try to win the trick
+        const ledSuit = trick[0].card.suit;
+        const currentWinner = this._currentTrickWinner(trick, trump);
+        const currentWinnerTeam = TekkaRules.teamOf(currentWinner.playerIndex);
+        const myTeam = TekkaRules.teamOf(botIndex);
+
+        if (currentWinnerTeam === myTeam) {
+            // Partner is winning — play low to save high cards
+            return this._lowestCard(legal);
+        }
+
+        // Try to win the trick
+        const canWin = legal.filter(c => this._beatsCurrentWinner(c, currentWinner.card, ledSuit, trump));
+        if (canWin.length > 0) {
+            // Play lowest winning card
+            canWin.sort((a, b) => a.value - b.value);
+            return canWin[0];
+        }
+
+        // Can't win — throw lowest card
+        return this._lowestCard(legal);
+    }
+
+    // --- Defender strategy: prevent declarant from making bid ---
+    static _playAsDefender(legal, trick, trump, botIndex, gameState, difficulty) {
+        const isLeading = !trick || trick.length === 0;
+
+        if (isLeading) {
+            // Lead: play safe card — highest non-trump, or lowest overall
+            const nonTrump = legal.filter(c => c.suit !== trump);
+            if (nonTrump.length > 0) {
+                nonTrump.sort((a, b) => b.value - a.value);
+                // Lead high to try to win tricks from declarant
+                if (difficulty === 'hard') return nonTrump[0];
+                return nonTrump[Math.floor(nonTrump.length / 2)];
+            }
+            return this._lowestCard(legal);
+        }
+
+        const ledSuit = trick[0].card.suit;
+        const currentWinner = this._currentTrickWinner(trick, trump);
+        const currentWinnerTeam = TekkaRules.teamOf(currentWinner.playerIndex);
+        const myTeam = TekkaRules.teamOf(botIndex);
+
+        if (currentWinnerTeam === myTeam) {
+            // Partner winning — throw low useless card
+            return this._lowestCard(legal);
+        }
+
+        // Opponents winning — try to win the trick
+        const canWin = legal.filter(c => this._beatsCurrentWinner(c, currentWinner.card, ledSuit, trump));
+        if (canWin.length > 0) {
+            canWin.sort((a, b) => a.value - b.value);
+            return canWin[0];
+        }
+
+        // Can't win — throw lowest non-trump (preserve trumps for later)
+        const nonTrump = legal.filter(c => c.suit !== trump);
+        if (nonTrump.length > 0) return this._lowestCard(nonTrump);
+        return this._lowestCard(legal);
+    }
+
+    // ---- Helpers ----
+
+    static _highestCard(cards) {
+        return cards.reduce((best, c) => c.value > best.value ? c : best, cards[0]);
+    }
+
+    static _lowestCard(cards) {
+        return cards.reduce((best, c) => c.value < best.value ? c : best, cards[0]);
+    }
+
+    static _currentTrickWinner(trick, trump) {
+        const ledSuit = trick[0].card.suit;
+        let winner = trick[0];
+        for (let i = 1; i < trick.length; i++) {
+            const e = trick[i];
+            const isTrump = e.card.suit === trump;
+            const winnerTrump = winner.card.suit === trump;
+            if (isTrump && !winnerTrump) { winner = e; }
+            else if (isTrump && winnerTrump && e.card.value > winner.card.value) { winner = e; }
+            else if (!isTrump && !winnerTrump && e.card.suit === ledSuit && e.card.value > winner.card.value) { winner = e; }
+        }
+        return winner;
+    }
+
+    static _beatsCurrentWinner(card, winnerCard, ledSuit, trump) {
+        const isTrump = card.suit === trump;
+        const winnerIsTrump = winnerCard.suit === trump;
+        if (isTrump && !winnerIsTrump) return true;
+        if (isTrump && winnerIsTrump) return card.value > winnerCard.value;
+        if (!isTrump && !winnerIsTrump && card.suit === ledSuit) return card.value > winnerCard.value;
+        return false;
+    }
+}
+
+/* === game.js === */
+/* === Tekka Card Game: game.js === */
+'use strict';
+
+class TekkaGame {
+    constructor() {
+        this.reset();
+    }
+
+    reset() {
+        this.phase = PHASE.IDLE;
+        this.hands = [[], [], [], []];       // [South, West, North, East]
+        this.dealer = SEAT.SOUTH;            // South deals first
+
+        // Bidding
+        this.biddingOrder = [];              // Order of seats for this round's bidding
+        this.biddingStep = 0;               // Which position in biddingOrder is current
+        this.bids = [null, null, null, null];// null=not yet, 'pass', or number/'double13'
+        this.highBid = null;                // Current highest bid value
+        this.highBidder = null;             // Seat index of highest bidder
+        this.forcedEight = false;           // Last bidder was forced to bid 8
+
+        // Playing
+        this.trump = null;
+        this.trumpRevealed = false;
+        this.currentTrick = [];             // {card, playerIndex}[]
+        this.completedTricks = [];          // All completed tricks this hand
+        this.trickNumber = 1;
+        this.tricksWon = [0, 0, 0, 0];     // Per player
+        this.teamTricks = [0, 0];           // [TeamA(N/S), TeamB(W/E)]
+        this.activePlayer = null;
+
+        // Scoring
+        this.teamScores = [0, 0];
+        this.declarantTeam = null;
+        this.contractAmount = null;
+        this.contractType = null;
+        this.roundHistory = [];
+
+        // Player info
+        this.players = [
+            { name: 'You', isHuman: true, isBot: false },
+            { name: 'West Bot', isHuman: false, isBot: true },
+            { name: 'North Bot', isHuman: false, isBot: true },
+            { name: 'East Bot', isHuman: false, isBot: true }
+        ];
+        this.difficulty = 'hard';
+        this.shuffleOnDeal = true;          // Only shuffle on very first deal
+        this.handNumber = 0;
+        this.isOnline = false;
+    }
+
+    // -------------------------------------------------------------------------
+    // DEALING
+    // -------------------------------------------------------------------------
+    deal(opts = {}) {
+        this.handNumber++;
+        this.phase = PHASE.DEALING;
+
+        const deck = new Deck();
+        if (this.shuffleOnDeal || opts.forceShuffled) deck.shuffle();
+        this.shuffleOnDeal = false;         // Only shuffle first time per session
+
+        // Deal counter-clockwise starting from seat after dealer
+        const rawHands = deck.deal(4);
+        // The raw deal goes in order 0,1,2,3; for CCW from after dealer we reindex
+        // For simplicity, deal to seats in order starting from dealer+CCW
+        // This just assigns hands randomly which is fine
+        this.hands = rawHands;
+
+        // Reset per-hand state
+        this.bids = [null, null, null, null];
+        this.highBid = null;
+        this.highBidder = null;
+        this.forcedEight = false;
+        this.trump = null;
+        this.trumpRevealed = false;
+        this.currentTrick = [];
+        this.completedTricks = [];
+        this.trickNumber = 1;
+        this.tricksWon = [0, 0, 0, 0];
+        this.teamTricks = [0, 0];
+        this.declarantTeam = null;
+        this.contractAmount = null;
+        this.contractType = null;
+
+        // Set up bidding order
+        this.biddingOrder = TekkaRules.biddingOrder(this.dealer);
+        this.biddingStep = 0;
+
+        this.phase = PHASE.BIDDING;
+        this.activePlayer = this.biddingOrder[0];
+
+        return this;
+    }
+
+    // -------------------------------------------------------------------------
+    // MISDEAL CHECK
+    // -------------------------------------------------------------------------
+    checkMisdeal(seatIndex) {
+        return TekkaRules.isMisdeal(this.hands[seatIndex]);
+    }
+
+    requestMisdeal() {
+        // Rotate dealer and redeal
+        this.dealer = TekkaRules.ccwNext(this.dealer);
+        this.shuffleOnDeal = true;
+        return this.deal({ forceShuffled: true });
+    }
+
+    // -------------------------------------------------------------------------
+    // BIDDING
+    // -------------------------------------------------------------------------
+    get currentBidder() {
+        if (this.biddingStep >= 4) return null;
+        return this.biddingOrder[this.biddingStep];
+    }
+
+    placeBid(seatIndex, bid) {
+        if (this.phase !== PHASE.BIDDING) return { error: 'Not in bidding phase' };
+        if (seatIndex !== this.currentBidder) return { error: 'Not your turn to bid' };
+        if (bid !== BID.PASS && !TekkaRules.isHigherBid(bid, this.highBid)) {
+            return { error: 'Bid must be higher than current bid' };
+        }
+
+        this.bids[seatIndex] = bid;
+
+        if (bid !== BID.PASS) {
+            this.highBid = bid;
+            this.highBidder = seatIndex;
+        }
+
+        this.biddingStep++;
+
+        // Check if bidding complete
+        if (this.biddingStep === 4) {
+            return this._resolveBidding();
+        }
+
+        // Advance to next bidder
+        this.activePlayer = this.currentBidder;
+        return { ok: true, phase: PHASE.BIDDING, nextBidder: this.currentBidder };
+    }
+
+    _resolveBidding() {
+        const nonPasses = this.bids.filter(b => b !== null && b !== BID.PASS);
+
+        if (nonPasses.length === 0) {
+            // ALL PASSED: special rule — last bidder must bid 8
+            this.forcedEight = true;
+            const lastBidder = this.biddingOrder[3];
+            this.bids[lastBidder] = 8;
+            this.highBid = 8;
+            this.highBidder = lastBidder;
+        }
+
+        // Declarant is the highest bidder
+        const declarantSeat = this.highBidder;
+        this.declarantTeam = TekkaRules.teamOf(declarantSeat);
+        this.contractAmount = this.highBid;
+        this.contractType = this.highBid === BID.DOUBLE13 ? BID.DOUBLE13 : 'normal';
+
+        // Declarant leads first (this reveals the trump)
+        this.phase = PHASE.TRUMP_LEAD;
+        this.activePlayer = declarantSeat;
+
+        return {
+            ok: true,
+            phase: PHASE.TRUMP_LEAD,
+            declarant: declarantSeat,
+            bid: this.highBid,
+            bidType: this.contractType,
+            forcedEight: this.forcedEight
+        };
+    }
+
+    // -------------------------------------------------------------------------
+    // PLAYING
+    // -------------------------------------------------------------------------
+
+    // Play a card: handles both TRUMP_LEAD and PLAYING phases
+    playCard(seatIndex, card) {
+        if (this.phase !== PHASE.TRUMP_LEAD && this.phase !== PHASE.PLAYING) {
+            return { error: 'Not in playing phase' };
+        }
+        if (seatIndex !== this.activePlayer) {
+            return { error: `Not your turn. Active: ${this.activePlayer}` };
+        }
+
+        // Find the card in the player's hand
+        const cardIdx = this.hands[seatIndex].findIndex(c => c.id === card.id);
+        if (cardIdx === -1) return { error: 'Card not in hand' };
+
+        // Check legality
+        if (this.phase === PHASE.PLAYING) {
+            const legal = TekkaRules.legalCards(this.hands[seatIndex], this.currentTrick, this.trump);
+            if (!legal.some(c => c.id === card.id)) {
+                return { error: 'Illegal card: must follow suit' };
+            }
+        }
+
+        // Remove card from hand
+        this.hands[seatIndex].splice(cardIdx, 1);
+
+        // If this is the first card of the game (TRUMP_LEAD phase), set trump
+        if (this.phase === PHASE.TRUMP_LEAD) {
+            this.trump = card.suit;
+            this.trumpRevealed = true;
+            this.phase = PHASE.PLAYING;
+        }
+
+        // Add to current trick
+        this.currentTrick.push({ card, playerIndex: seatIndex });
+
+        // Check if trick is complete (4 cards played)
+        if (this.currentTrick.length === 4) {
+            return this._completeTrick();
+        }
+
+        // Advance to next player (CCW)
+        this.activePlayer = TekkaRules.ccwNext(seatIndex);
+        return {
+            ok: true,
+            phase: PHASE.PLAYING,
+            trump: this.trump,
+            nextPlayer: this.activePlayer
+        };
+    }
+
+    _completeTrick() {
+        const winner = TekkaRules.trickWinner(this.currentTrick, this.trump);
+        const winnerTeam = TekkaRules.teamOf(winner);
+
+        this.tricksWon[winner]++;
+        this.teamTricks[winnerTeam]++;
+        this.completedTricks.push({ cards: [...this.currentTrick], winner, trickNumber: this.trickNumber });
+
+        const result = {
+            ok: true,
+            trickComplete: true,
+            winner,
+            winnerTeam,
+            trickCards: [...this.currentTrick],
+            trickNumber: this.trickNumber,
+            teamTricks: [...this.teamTricks]
+        };
+
+        this.currentTrick = [];
+        this.trickNumber++;
+
+        // Check if all 13 tricks played
+        if (this.trickNumber > TOTAL_TRICKS) {
+            return this._endRound(result);
+        }
+
+        // Winner of trick leads next
+        this.activePlayer = winner;
+        result.phase = PHASE.PLAYING;
+        result.nextPlayer = winner;
+        return result;
+    }
+
+    _endRound(trickResult) {
+        const roundResult = TekkaRules.calculateRoundScore(
+            this.contractAmount,
+            this.contractType,
+            this.declarantTeam,
+            this.teamTricks,
+            this.forcedEight
+        );
+
+        this.teamScores[0] += roundResult.declarantTeam === 0
+            ? roundResult.declarantPoints
+            : roundResult.defenderPoints;
+        this.teamScores[1] += roundResult.declarantTeam === 1
+            ? roundResult.declarantPoints
+            : roundResult.defenderPoints;
+
+        this.roundHistory.push({
+            handNumber: this.handNumber,
+            dealer: this.dealer,
+            declarant: this.highBidder,
+            declarantTeam: this.declarantTeam,
+            contract: this.contractAmount,
+            contractType: this.contractType,
+            tricksTaken: this.teamTricks[this.declarantTeam],
+            made: roundResult.made,
+            teamScores: [...this.teamScores]
+        });
+
+        this.phase = PHASE.ROUND_END;
+
+        // Check game over
+        const gameOver = this.teamScores[0] >= TARGET_SCORE || this.teamScores[1] >= TARGET_SCORE;
+        if (gameOver) {
+            this.phase = PHASE.GAME_OVER;
+        }
+
+        // Rotate dealer (CCW)
+        this.dealer = TekkaRules.ccwNext(this.dealer);
+
+        return {
+            ...trickResult,
+            roundEnd: true,
+            roundResult,
+            teamScores: [...this.teamScores],
+            gameOver,
+            winner: gameOver ? (this.teamScores[0] < this.teamScores[1] ? 0 : 1) : null
+        };
+    }
+
+    // -------------------------------------------------------------------------
+    // HELPERS
+    // -------------------------------------------------------------------------
+    getPlayerHand(seatIndex) {
+        return [...this.hands[seatIndex]];
+    }
+
+    isHumanTurn() {
+        return this.activePlayer === SEAT.SOUTH && (
+            this.phase === PHASE.BIDDING ||
+            this.phase === PHASE.TRUMP_LEAD ||
+            this.phase === PHASE.PLAYING
+        );
+    }
+
+    getTeamName(teamIndex) {
+        return teamIndex === 0 ? 'Team N/S' : 'Team W/E';
+    }
+
+    getDeclarantName() {
+        if (this.highBidder === null) return '';
+        return this.players[this.highBidder].name;
+    }
+
+    getLegalCards(seatIndex) {
+        if (this.phase === PHASE.TRUMP_LEAD && seatIndex === this.activePlayer) {
+            return [...this.hands[seatIndex]]; // Any card can be led to set trump
+        }
+        return TekkaRules.legalCards(this.hands[seatIndex], this.currentTrick, this.trump);
+    }
+
+    getLegalBids() {
+        return TekkaRules.legalBids(this.highBid);
+    }
+
+    // Serialize game state for network transmission
+    serialize() {
+        return {
+            phase: this.phase,
+            dealer: this.dealer,
+            bids: this.bids,
+            highBid: this.highBid,
+            highBidder: this.highBidder,
+            trump: this.trump,
+            trumpRevealed: this.trumpRevealed,
+            trickNumber: this.trickNumber,
+            teamTricks: this.teamTricks,
+            tricksWon: this.tricksWon,
+            teamScores: this.teamScores,
+            declarantTeam: this.declarantTeam,
+            contractAmount: this.contractAmount,
+            contractType: this.contractType,
+            activePlayer: this.activePlayer,
+            biddingStep: this.biddingStep,
+            biddingOrder: this.biddingOrder,
+            handCounts: this.hands.map(h => h.length)
+        };
+    }
+}
+
+/* === network.js === */
+/* === Tekka Card Game: network.js === */
+'use strict';
+
+/**
+ * TekkaNetwork — MQTT-based online multiplayer for Tekka.
+ * Uses public MQTT brokers over WebSockets (same approach as Qalbaka/Hearts).
+ * Message types: join, bid, play, state, chat, leave, start, seat_assign
+ */
+class TekkaNetwork {
+
+    constructor() {
+        this.client = null;
+        this.roomCode = null;
+        this.password = null;
+        this.playerName = 'Guest';
+        this.mySeatIndex = null;    // 0=South, 1=West, 2=North, 3=East
+        this.isHost = false;
+        this.connected = false;
+        this.baseTopic = null;
+        this.players = {};          // { seatIndex: { name, connected } }
+        this._pendingBrokerIndex = 0;
+        this.currentBrokerIndex = 0;
+
+        // Callbacks (set by UI)
+        this.onPlayerJoined = null;
+        this.onPlayerLeft = null;
+        this.onBidPlaced = null;
+        this.onCardPlayed = null;
+        this.onGameStarted = null;
+        this.onStateSync = null;
+        this.onChatMessage = null;
+        this.onConnectionChange = null;
+        this.onError = null;
+        this.onAllPlayersReady = null;
+
+        this._brokers = [
+            { host: 'broker.emqx.io', port: 8084, protocol: 'wss' },
+            { host: 'broker.hivemq.com', port: 8884, protocol: 'wss' },
+            { host: 'test.mosquitto.org', port: 8081, protocol: 'wss' }
+        ];
+
+        this._msgQueue = [];
+        this._heartbeatTimer = null;
+    }
+
+    // -------------------------------------------------------------------------
+    // Connection
+    // -------------------------------------------------------------------------
+    connect(opts = {}) {
+        this.roomCode = (opts.roomCode || '').toUpperCase();
+        this.password = opts.password || '';
+        this.playerName = opts.playerName || 'Guest';
+        this.isHost = opts.isHost || false;
+        this.mySeatIndex = opts.seatIndex !== undefined ? opts.seatIndex : (this.isHost ? SEAT.SOUTH : null);
+
+        this.baseTopic = `tekka/v1/${this.roomCode}/${this._hashPassword(this.password)}`;
+
+        const brokerIdx = this._pendingBrokerIndex || this.currentBrokerIndex || 0;
+        this.currentBrokerIndex = brokerIdx;
+        const broker = this._brokers[brokerIdx % this._brokers.length];
+
+        try {
+            const clientId = `tekka_${this.roomCode}_${Math.random().toString(36).substr(2, 8)}`;
+            this.client = mqtt.connect(`${broker.protocol}://${broker.host}:${broker.port}/mqtt`, {
+                clientId,
+                clean: true,
+                connectTimeout: 8000,
+                reconnectPeriod: 3000,
+                keepalive: 25
+            });
+
+            this.client.on('connect', () => {
+                this.connected = true;
+                this._subscribe();
+                this._announce();
+                this._startHeartbeat();
+                if (this.onConnectionChange) this.onConnectionChange(true, broker.host);
+            });
+
+            this.client.on('message', (topic, payload) => {
+                try {
+                    const msg = JSON.parse(payload.toString());
+                    this._handleMessage(topic, msg);
+                } catch (e) {}
+            });
+
+            this.client.on('error', (err) => {
+                if (this.onError) this.onError(err.message || 'Connection error');
+                this._tryNextBroker();
+            });
+
+            this.client.on('close', () => {
+                this.connected = false;
+                if (this.onConnectionChange) this.onConnectionChange(false);
+            });
+        } catch (e) {
+            if (this.onError) this.onError('Failed to connect: ' + e.message);
+        }
+    }
+
+    _subscribe() {
+        const topics = [
+            `${this.baseTopic}/lobby`,
+            `${this.baseTopic}/game`,
+            `${this.baseTopic}/chat`,
+            `${this.baseTopic}/state`
+        ];
+        topics.forEach(t => this.client.subscribe(t, { qos: 1 }));
+    }
+
+    _announce() {
+        this._publish('lobby', {
+            type: 'join',
+            name: this.playerName,
+            seat: this.mySeatIndex,
+            isHost: this.isHost,
+            ts: Date.now()
+        });
+    }
+
+    _startHeartbeat() {
+        this._heartbeatTimer = setInterval(() => {
+            if (this.connected) {
+                this._publish('lobby', {
+                    type: 'heartbeat',
+                    seat: this.mySeatIndex,
+                    name: this.playerName,
+                    ts: Date.now()
+                });
+            }
+        }, 10000);
+    }
+
+    _tryNextBroker() {
+        if (this.client) { try { this.client.end(true); } catch (e) {} }
+        this.currentBrokerIndex = (this.currentBrokerIndex + 1) % this._brokers.length;
+        setTimeout(() => this.connect({
+            roomCode: this.roomCode,
+            password: this.password,
+            playerName: this.playerName,
+            isHost: this.isHost,
+            seatIndex: this.mySeatIndex
+        }), 1500);
+    }
+
+    disconnect() {
+        clearInterval(this._heartbeatTimer);
+        if (this.client) {
+            this._publish('lobby', { type: 'leave', seat: this.mySeatIndex, name: this.playerName });
+            setTimeout(() => { try { this.client.end(); } catch (e) {} }, 300);
+        }
+        this.connected = false;
+        this.client = null;
+    }
+
+    // -------------------------------------------------------------------------
+    // Message sending
+    // -------------------------------------------------------------------------
+    sendBid(bid) {
+        this._publish('game', {
+            type: 'bid',
+            seat: this.mySeatIndex,
+            bid,
+            ts: Date.now()
+        });
+    }
+
+    sendCardPlayed(card) {
+        this._publish('game', {
+            type: 'play',
+            seat: this.mySeatIndex,
+            card: { suit: card.suit, rank: card.rank },
+            ts: Date.now()
+        });
+    }
+
+    sendStateSync(gameState) {
+        this._publish('state', {
+            type: 'state',
+            from: this.mySeatIndex,
+            state: gameState,
+            ts: Date.now()
+        });
+    }
+
+    sendStartGame(gameState) {
+        this._publish('game', {
+            type: 'start',
+            from: this.mySeatIndex,
+            hands: gameState.hands.map(h => h.map(c => ({ suit: c.suit, rank: c.rank }))),
+            dealer: gameState.dealer,
+            biddingOrder: gameState.biddingOrder,
+            ts: Date.now()
+        });
+    }
+
+    sendSeatAssign(assignments) {
+        // assignments: { seatIndex: { name } }
+        this._publish('lobby', {
+            type: 'seat_assign',
+            from: this.mySeatIndex,
+            assignments,
+            ts: Date.now()
+        });
+    }
+
+    sendChat(message) {
+        this._publish('chat', {
+            type: 'chat',
+            seat: this.mySeatIndex,
+            name: this.playerName,
+            message,
+            ts: Date.now()
+        });
+    }
+
+    // -------------------------------------------------------------------------
+    // Message handling
+    // -------------------------------------------------------------------------
+    _handleMessage(topic, msg) {
+        const channel = topic.split('/').pop();
+
+        if (msg.seat === this.mySeatIndex && msg.from === undefined) return; // ignore own messages
+
+        switch (msg.type) {
+            case 'join':
+            case 'heartbeat':
+                this.players[msg.seat] = { name: msg.name, connected: true, ts: msg.ts };
+                if (this.onPlayerJoined) this.onPlayerJoined({ seat: msg.seat, name: msg.name, players: this.players });
+                break;
+
+            case 'leave':
+                if (this.players[msg.seat]) this.players[msg.seat].connected = false;
+                if (this.onPlayerLeft) this.onPlayerLeft({ seat: msg.seat, name: msg.name });
+                break;
+
+            case 'seat_assign':
+                if (msg.from !== this.mySeatIndex && msg.assignments) {
+                    // Find our seat from assignments
+                    for (const [seat, info] of Object.entries(msg.assignments)) {
+                        if (info.name === this.playerName && this.mySeatIndex === null) {
+                            this.mySeatIndex = parseInt(seat);
+                        }
+                        this.players[seat] = info;
+                    }
+                    if (this.onPlayerJoined) this.onPlayerJoined({ players: this.players });
+                }
+                break;
+
+            case 'start':
+                if (msg.from !== this.mySeatIndex && this.onGameStarted) {
+                    this.onGameStarted({
+                        hands: msg.hands,
+                        dealer: msg.dealer,
+                        biddingOrder: msg.biddingOrder
+                    });
+                }
+                break;
+
+            case 'bid':
+                if (msg.seat !== this.mySeatIndex && this.onBidPlaced) {
+                    this.onBidPlaced({ seat: msg.seat, bid: msg.bid });
+                }
+                break;
+
+            case 'play':
+                if (msg.seat !== this.mySeatIndex && this.onCardPlayed) {
+                    this.onCardPlayed({
+                        seat: msg.seat,
+                        card: deserializeCard(msg.card)
+                    });
+                }
+                break;
+
+            case 'state':
+                if (msg.from !== this.mySeatIndex && this.onStateSync) {
+                    this.onStateSync(msg.state);
+                }
+                break;
+
+            case 'chat':
+                if (this.onChatMessage) this.onChatMessage({ seat: msg.seat, name: msg.name, message: msg.message });
+                break;
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Utilities
+    // -------------------------------------------------------------------------
+    _publish(channel, data) {
+        if (!this.client || !this.connected) return;
+        try {
+            this.client.publish(`${this.baseTopic}/${channel}`, JSON.stringify(data), { qos: 1 });
+        } catch (e) {}
+    }
+
+    _hashPassword(pwd) {
+        // Simple non-crypto hash for topic namespacing
+        let h = 0;
+        for (let i = 0; i < pwd.length; i++) {
+            h = (Math.imul(31, h) + pwd.charCodeAt(i)) | 0;
+        }
+        return Math.abs(h).toString(36).toUpperCase().padStart(6, '0');
+    }
+
+    static generateRoomCode() {
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        let code = 'TEKKA-';
+        for (let i = 0; i < 4; i++) code += chars[Math.floor(Math.random() * chars.length)];
+        return code;
+    }
+
+    buildShareLink(brokerIndex = 0) {
+        const origin = window.location.origin;
+        const path = window.location.pathname;
+        const pwd = encodeURIComponent(this.password);
+        return `${origin}${path}?room=${this.roomCode}&pwd=${pwd}&b=${brokerIndex}`;
+    }
+}
+
+/* === ui.js === */
+/* === Tekka Card Game: ui.js === */
+'use strict';
+
+class TekkaUI {
+    constructor(game, net) {
+        this.game = game;
+        this.net  = net;
+        this.selectedCard = null;
+        this.legalCardIds = new Set();
+        this.botDelay    = 900;      // ms between bot actions
+        this.onlineMode  = false;
+        this.pendingOppCards = [];   // For online: opponent cards played
+        this.toastTimer  = null;
+    }
+
+    // -------------------------------------------------------------------------
+    // INIT
+    // -------------------------------------------------------------------------
+    init() {
+        this._cacheEls();
+        this._bindMenuEvents();
+        this._bindOnlineEvents();
+        this._bindModalEvents();
+        this._checkAutoJoin();
+        this._showScreen('screen-main');
+        this._updateTheme();
+    }
+
+    _cacheEls() {
+        this.screenMain   = document.getElementById('screen-main');
+        this.screenGame   = document.getElementById('screen-game');
+
+        // Header & HUD
+        this.elTrumpSuit  = document.getElementById('trump-suit');
+        this.elTrumpIcon  = document.getElementById('trump-icon');
+        this.elContract   = document.getElementById('contract-info');
+        this.elTeamA      = document.getElementById('score-team-a');
+        this.elTeamB      = document.getElementById('score-team-b');
+        this.elTrickCount = document.getElementById('trick-count');
+        this.elStatusMsg  = document.getElementById('status-msg');
+        this.elTrickArea  = document.getElementById('trick-area');
+
+        // Player zones
+        this.elPlayers = {
+            [SEAT.SOUTH]: document.getElementById('player-south'),
+            [SEAT.WEST]:  document.getElementById('player-west'),
+            [SEAT.NORTH]: document.getElementById('player-north'),
+            [SEAT.EAST]:  document.getElementById('player-east')
+        };
+
+        // Bidding overlay
+        this.elBidOverlay  = document.getElementById('bid-overlay');
+        this.elBidButtons  = document.getElementById('bid-buttons');
+        this.elBidStatus   = document.getElementById('bid-status');
+        this.elBidHistory  = document.getElementById('bid-history');
+
+        // Online modal
+        this.elModalOnline = document.getElementById('modal-online');
+        this.elOnlineTabs  = document.querySelectorAll('.online-tab-btn');
+        this.elViewCreate  = document.getElementById('view-create');
+        this.elViewJoin    = document.getElementById('view-join');
+        this.elViewLobby   = document.getElementById('view-lobby');
+
+        // Toast
+        this.elToast = document.getElementById('toast');
+
+        // Hand cards (south = human)
+        this.elHandSouth = document.getElementById('hand-south');
+
+        // Modal elements
+        this.elModalScoreboard = document.getElementById('modal-scoreboard');
+        this.elModalRoundEnd   = document.getElementById('modal-round-end');
+        this.elModalGameOver   = document.getElementById('modal-game-over');
+        this.elModalRules      = document.getElementById('modal-rules');
+        this.elModalSettings   = document.getElementById('modal-settings');
+        this.elModalMenu       = document.getElementById('modal-menu');
+    }
+
+    // -------------------------------------------------------------------------
+    // SCREEN MANAGEMENT
+    // -------------------------------------------------------------------------
+    _showScreen(id) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
+        document.getElementById(id)?.classList.remove('hidden');
+    }
+
+    // -------------------------------------------------------------------------
+    // MENU EVENTS
+    // -------------------------------------------------------------------------
+    _bindMenuEvents() {
+        document.getElementById('btn-new-game')?.addEventListener('click', () => this._startNewGame());
+        document.getElementById('btn-online')?.addEventListener('click', () => this._openOnlineModal());
+        document.getElementById('btn-rules')?.addEventListener('click', () => this._openModal('modal-rules'));
+        document.getElementById('btn-scoreboard')?.addEventListener('click', () => this._renderScoreboard());
+        document.getElementById('btn-settings')?.addEventListener('click', () => this._openModal('modal-settings'));
+        document.getElementById('btn-menu')?.addEventListener('click', () => this._openModal('modal-menu'));
+
+        // In-game bottom actions
+        document.getElementById('btn-game-menu')?.addEventListener('click', () => this._openModal('modal-menu'));
+
+        // Menu modal items
+        document.getElementById('menu-new-game')?.addEventListener('click', () => {
+            this._closeModal('modal-menu');
+            this._startNewGame();
+        });
+        document.getElementById('menu-online')?.addEventListener('click', () => {
+            this._closeModal('modal-menu');
+            this._openOnlineModal();
+        });
+        document.getElementById('menu-scoreboard')?.addEventListener('click', () => {
+            this._closeModal('modal-menu');
+            this._renderScoreboard();
+        });
+        document.getElementById('menu-rules')?.addEventListener('click', () => {
+            this._closeModal('modal-menu');
+            this._openModal('modal-rules');
+        });
+        document.getElementById('menu-settings')?.addEventListener('click', () => {
+            this._closeModal('modal-menu');
+            this._openModal('modal-settings');
+        });
+
+        // Close buttons
+        document.querySelectorAll('[data-close]').forEach(btn => {
+            btn.addEventListener('click', () => this._closeModal(btn.dataset.close));
+        });
+
+        // Difficulty setting
+        document.getElementById('setting-difficulty')?.addEventListener('change', (e) => {
+            this.game.difficulty = e.target.value;
+        });
+
+        // Play Again button in game-over modal
+        document.getElementById('btn-play-again')?.addEventListener('click', () => {
+            this._closeModal('modal-game-over');
+            this._startNewGame();
+        });
+
+        document.getElementById('btn-next-hand')?.addEventListener('click', () => {
+            this._closeModal('modal-round-end');
+            this._dealNewHand();
+        });
+    }
+
+    // -------------------------------------------------------------------------
+    // GAME START / DEAL
+    // -------------------------------------------------------------------------
+    _startNewGame() {
+        this.game.reset();
+        this.game.shuffleOnDeal = true;
+        this.onlineMode = false;
+        this._showScreen('screen-game');
+        this._dealNewHand();
+    }
+
+    _dealNewHand() {
+        this.game.deal();
+        this._resetBoard();
+        this._renderAllHands();
+        this._updateScoreDisplay();
+        this._updateTrumpDisplay();
+        this._hideBidOverlay();
+        this._startBidding();
+    }
+
+    _resetBoard() {
+        this.selectedCard = null;
+        this.legalCardIds.clear();
+        this.elTrickArea.innerHTML = '';
+        this.elTrumpSuit.textContent = '—';
+        this.elTrumpIcon.textContent = '';
+        this.elContract.textContent = '';
+        if (this.elBidHistory) this.elBidHistory.innerHTML = '';
+        // Reset player trick counts
+        for (let i = 0; i < 4; i++) {
+            const el = document.getElementById(`tricks-${i}`);
+            if (el) el.textContent = '0';
+        }
+        // Clear active highlights
+        document.querySelectorAll('.player-zone').forEach(z => z.classList.remove('active-turn'));
+    }
+
+    // -------------------------------------------------------------------------
+    // BIDDING
+    // -------------------------------------------------------------------------
+    _startBidding() {
+        this._updateStatusMsg(`Round ${this.game.handNumber} — Bidding starts!`);
+        this._showBidOverlay();
+        this._runBiddingTurn();
+    }
+
+    _runBiddingTurn() {
+        const bidder = this.game.currentBidder;
+        if (bidder === null) return;
+
+        this._highlightActivePlayer(bidder);
+        const name = this.game.players[bidder].name;
+        const legal = this.game.getLegalBids();
+
+        if (this.game.players[bidder].isHuman && !this.onlineMode) {
+            // Human bids
+            this._updateStatusMsg(`Your turn to bid. Current high bid: ${this._formatBid(this.game.highBid)}`);
+            this._renderBidButtons(legal, bidder);
+        } else if (!this.onlineMode) {
+            // Bot bids
+            this._updateStatusMsg(`${name} is thinking...`);
+            this._hideBidButtons();
+            setTimeout(() => this._doBotBid(bidder), this.botDelay);
+        }
+        // Online: wait for network message
+    }
+
+    _doBotBid(seatIndex) {
+        const hand = this.game.getPlayerHand(seatIndex);
+        const partnerSeat = TekkaRules.partnerOf(seatIndex);
+        const partnerBid = this.game.bids[partnerSeat];
+        const pos = this.game.biddingOrder.indexOf(seatIndex);
+
+        const bid = TekkaAI.decideBid(
+            hand,
+            this.game.highBid,
+            pos,
+            partnerBid,
+            this.game.difficulty
+        );
+
+        this._applyBid(seatIndex, bid);
+    }
+
+    _applyBid(seatIndex, bid) {
+        // Add to bid history
+        this._addBidHistory(seatIndex, bid);
+
+        const result = this.game.placeBid(seatIndex, bid);
+
+        if (result.error) {
+            this.showToast(result.error, 3000);
+            return;
+        }
+
+        // Update player badge to show bid
+        this._showPlayerBid(seatIndex, bid);
+
+        if (result.phase === PHASE.TRUMP_LEAD) {
+            // Bidding ended — show result
+            this._onBiddingComplete(result);
+        } else {
+            // Continue bidding
+            this._runBiddingTurn();
+        }
+    }
+
+    _onBiddingComplete(result) {
+        const declarantName = this.game.players[result.declarant].name;
+        const bidLabel = this._formatBid(result.bid);
+        const forcedMsg = result.forcedEight ? ' (everyone passed — forced bid)' : '';
+
+        this._updateStatusMsg(`${declarantName} wins bid: ${bidLabel}${forcedMsg}. Lead a card to set trump!`);
+        this._hideBidOverlay();
+        this._updateContractDisplay();
+
+        // Render legal hand for declarant (all cards are legal for first lead)
+        this._renderAllHands();
+
+        setTimeout(() => {
+            if (this.game.players[result.declarant].isHuman && !this.onlineMode) {
+                this.showToast('🎴 Lead any card — that suit becomes TRUMP!', 4000);
+                this._enableHumanPlay();
+            } else if (!this.onlineMode) {
+                setTimeout(() => this._doBotTrumpLead(result.declarant), this.botDelay);
+            }
+        }, 400);
+    }
+
+    _doBotTrumpLead(seatIndex) {
+        const hand = this.game.getPlayerHand(seatIndex);
+        const card = TekkaAI.chooseTrumpLead(hand, this.game.difficulty);
+        this._applyCardPlay(seatIndex, card);
+    }
+
+    _renderBidButtons(legalBids, forSeat) {
+        if (!this.elBidButtons) return;
+        this.elBidButtons.innerHTML = '';
+
+        legalBids.forEach(bid => {
+            const btn = document.createElement('button');
+            btn.className = bid === BID.PASS ? 'bid-btn bid-pass' :
+                            bid === BID.DOUBLE13 ? 'bid-btn bid-double13' : 'bid-btn';
+            btn.textContent = this._formatBid(bid);
+            btn.addEventListener('click', () => {
+                if (!this.onlineMode) {
+                    this._applyBid(forSeat, bid);
+                } else {
+                    this.net.sendBid(bid);
+                    this._applyBid(forSeat, bid);
+                }
+            });
+            this.elBidButtons.appendChild(btn);
+        });
+
+        this.elBidButtons.classList.remove('hidden');
+    }
+
+    _hideBidButtons() {
+        if (this.elBidButtons) this.elBidButtons.classList.add('hidden');
+    }
+
+    _showBidOverlay() {
+        if (this.elBidOverlay) this.elBidOverlay.classList.remove('hidden');
+    }
+
+    _hideBidOverlay() {
+        if (this.elBidOverlay) this.elBidOverlay.classList.add('hidden');
+    }
+
+    _addBidHistory(seatIndex, bid) {
+        if (!this.elBidHistory) return;
+        const name = this.game.players[seatIndex].name;
+        const entry = document.createElement('div');
+        entry.className = `bid-entry team-${TekkaRules.teamOf(seatIndex)}`;
+        entry.innerHTML = `<span class="bid-name">${name}</span><span class="bid-val">${this._formatBid(bid)}</span>`;
+        this.elBidHistory.appendChild(entry);
+    }
+
+    _showPlayerBid(seatIndex, bid) {
+        const badgeEl = document.getElementById(`player-bid-${seatIndex}`);
+        if (badgeEl) {
+            badgeEl.textContent = this._formatBid(bid);
+            badgeEl.className = 'player-bid-badge ' + (bid === BID.PASS ? 'pass' : 'active-bid');
+            badgeEl.classList.remove('hidden');
+        }
+    }
+
+    _formatBid(bid) {
+        if (bid === null) return '—';
+        if (bid === BID.PASS) return 'Pass';
+        if (bid === BID.DOUBLE13) return '★ Double 13';
+        return String(bid);
+    }
+
+    // -------------------------------------------------------------------------
+    // CARD PLAY
+    // -------------------------------------------------------------------------
+    _enableHumanPlay() {
+        const legal = this.game.getLegalCards(SEAT.SOUTH);
+        this.legalCardIds = new Set(legal.map(c => c.id));
+        this._renderHand(SEAT.SOUTH, this.game.getPlayerHand(SEAT.SOUTH), true);
+    }
+
+    _disableHumanPlay() {
+        this.legalCardIds.clear();
+        this._renderHand(SEAT.SOUTH, this.game.getPlayerHand(SEAT.SOUTH), false);
+    }
+
+    _applyCardPlay(seatIndex, card) {
+        const result = this.game.playCard(seatIndex, card);
+        if (result.error) {
+            this.showToast(result.error, 2000);
+            return;
+        }
+
+        // If trump was just revealed
+        if (result.trump && !this.elTrumpIcon.textContent) {
+            this._updateTrumpDisplay();
+            const suit = SUIT_NAMES[result.trump];
+            this.showToast(`🎴 Trump is ${SUIT_SYMBOLS[result.trump]} ${suit}!`, 3500);
+        }
+
+        // Animate card to trick area
+        this._animateCardToTrick(seatIndex, card);
+
+        // Update hand display
+        if (seatIndex === SEAT.SOUTH) {
+            this.legalCardIds.clear();
+        }
+        this._renderHand(seatIndex, this.game.getPlayerHand(seatIndex), false);
+
+        if (result.trickComplete) {
+            setTimeout(() => this._onTrickComplete(result), 800);
+        } else {
+            this._onNextPlayer(result.nextPlayer, result.phase);
+        }
+    }
+
+    _onNextPlayer(nextPlayer, phase) {
+        this._updateStatusMsg(this._buildStatusText(nextPlayer, phase));
+        this._highlightActivePlayer(nextPlayer);
+
+        if (this.game.players[nextPlayer].isHuman && !this.onlineMode) {
+            this._enableHumanPlay();
+        } else if (!this.onlineMode) {
+            setTimeout(() => {
+                const hand = this.game.getPlayerHand(nextPlayer);
+                const card = TekkaAI.chooseCard(
+                    hand, this.game.currentTrick, this.game.trump,
+                    nextPlayer, this.game, this.game.difficulty
+                );
+                this._applyCardPlay(nextPlayer, card);
+            }, this.botDelay);
+        }
+    }
+
+    _onTrickComplete(result) {
+        // Show winner briefly
+        const winnerName = this.game.players[result.winner].name;
+        const winnerTeam = TekkaRules.teamOf(result.winner) === 0 ? 'Team N/S' : 'Team W/E';
+        this._updateStatusMsg(`${winnerName} wins the trick! (${winnerTeam})`);
+
+        // Update trick counts
+        this._updateTrickCounts();
+
+        // Clear trick area
+        setTimeout(() => {
+            this.elTrickArea.innerHTML = '';
+
+            if (result.roundEnd) {
+                this._onRoundEnd(result);
+            } else {
+                this._onNextPlayer(result.nextPlayer, result.phase);
+            }
+        }, 1000);
+    }
+
+    _onRoundEnd(result) {
+        const rr = result.roundResult;
+        this._updateScoreDisplay();
+        this._showRoundEndModal(rr, result);
+
+        if (result.gameOver) {
+            setTimeout(() => {
+                this._closeModal('modal-round-end');
+                this._showGameOverModal(result);
+            }, 3500);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // RENDERING
+    // -------------------------------------------------------------------------
+    _renderAllHands() {
+        for (let i = 0; i < 4; i++) {
+            const hand = sortHand(this.game.getPlayerHand(i), this.game.trump);
+            this._renderHand(i, hand, false);
+        }
+    }
+
+    _renderHand(seatIndex, hand, enableClick) {
+        if (seatIndex === SEAT.SOUTH) {
+            this._renderSouthHand(hand, enableClick);
+        } else {
+            this._renderBotHand(seatIndex, hand);
+        }
+    }
+
+    _renderSouthHand(hand, enableClick) {
+        const el = this.elHandSouth;
+        if (!el) return;
+        el.innerHTML = '';
+
+        const sorted = sortHand(hand, this.game.trump);
+        sorted.forEach(card => {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'card-wrapper';
+
+            const isLegal = this.legalCardIds.has(card.id);
+            const isPlayable = enableClick && isLegal;
+            wrapper.classList.toggle('legal', isLegal && enableClick);
+            wrapper.classList.toggle('illegal', enableClick && !isLegal);
+
+            wrapper.innerHTML = this._cardFaceHTML(card);
+
+            if (isPlayable) {
+                wrapper.addEventListener('click', () => {
+                    if (!this.legalCardIds.has(card.id)) return;
+                    this._disableHumanPlay();
+                    if (this.onlineMode) this.net.sendCardPlayed(card);
+                    this._applyCardPlay(SEAT.SOUTH, card);
+                });
+            }
+            el.appendChild(wrapper);
+        });
+    }
+
+    _renderBotHand(seatIndex, hand) {
+        const zone = this.elPlayers[seatIndex];
+        if (!zone) return;
+        const handEl = zone.querySelector('.bot-hand');
+        if (!handEl) return;
+
+        handEl.innerHTML = '';
+        const displayCount = Math.min(hand.length, 7);
+        for (let i = 0; i < displayCount; i++) {
+            const back = document.createElement('div');
+            back.className = 'card-back';
+            handEl.appendChild(back);
+        }
+        const badge = zone.querySelector('.card-count');
+        if (badge) badge.textContent = hand.length > 0 ? `${hand.length}` : '';
+    }
+
+    _cardFaceHTML(card) {
+        const color = card.isRed ? 'red' : 'black';
+        return `<div class="card-face ${color}">
+            <div class="card-corner top-left"><span class="rank">${card.displayRank}</span><span class="suit">${card.symbol}</span></div>
+            <div class="card-center">${card.symbol}</div>
+            <div class="card-corner bottom-right"><span class="rank">${card.displayRank}</span><span class="suit">${card.symbol}</span></div>
+        </div>`;
+    }
+
+    _animateCardToTrick(seatIndex, card) {
+        const posClass = SEAT_POSITIONS[seatIndex];
+        const existing = this.elTrickArea.querySelector(`.trick-slot.${posClass}`);
+        if (existing) existing.remove();
+
+        const slot = document.createElement('div');
+        slot.className = `trick-slot ${posClass}`;
+        slot.innerHTML = this._cardFaceHTML(card);
+        slot.classList.add('card-enter');
+        this.elTrickArea.appendChild(slot);
+        requestAnimationFrame(() => slot.classList.remove('card-enter'));
+    }
+
+    // -------------------------------------------------------------------------
+    // DISPLAY UPDATES
+    // -------------------------------------------------------------------------
+    _updateTrumpDisplay() {
+        if (!this.game.trump) {
+            if (this.elTrumpSuit) this.elTrumpSuit.textContent = 'TBD';
+            if (this.elTrumpIcon) this.elTrumpIcon.textContent = '';
+            return;
+        }
+        const suit = this.game.trump;
+        if (this.elTrumpSuit) this.elTrumpSuit.textContent = SUIT_NAMES[suit];
+        if (this.elTrumpIcon) {
+            this.elTrumpIcon.textContent = SUIT_SYMBOLS[suit];
+            this.elTrumpIcon.style.color = SUIT_COLORS[suit] === '#1a1a2e' ? '#fff' : '#ef4444';
+        }
+    }
+
+    _updateContractDisplay() {
+        if (!this.elContract) return;
+        const name = this.game.getDeclarantName();
+        const bid = this._formatBid(this.game.contractAmount);
+        const team = this.game.declarantTeam === 0 ? 'N/S' : 'W/E';
+        this.elContract.textContent = `Bid: ${bid} by ${name} (${team})`;
+    }
+
+    _updateScoreDisplay() {
+        const [a, b] = this.game.teamScores;
+        if (this.elTeamA) this.elTeamA.textContent = `N/S: ${a}`;
+        if (this.elTeamB) this.elTeamB.textContent = `W/E: ${b}`;
+    }
+
+    _updateTrickCounts() {
+        for (let i = 0; i < 4; i++) {
+            const el = document.getElementById(`tricks-${i}`);
+            if (el) el.textContent = this.game.tricksWon[i];
+        }
+        const [a, b] = this.game.teamTricks;
+        if (this.elTrickCount) this.elTrickCount.textContent = `N/S ${a} — W/E ${b}`;
+    }
+
+    _buildStatusText(nextPlayer, phase) {
+        if (phase === PHASE.TRUMP_LEAD) return `${this.game.players[nextPlayer].name}: Lead to set trump!`;
+        const isHuman = nextPlayer === SEAT.SOUTH;
+        return isHuman
+            ? `Trick ${this.game.trickNumber}/13: Your turn to play!`
+            : `Trick ${this.game.trickNumber}/13: ${this.game.players[nextPlayer].name} playing...`;
+    }
+
+    _updateStatusMsg(text) {
+        if (this.elStatusMsg) this.elStatusMsg.textContent = text;
+    }
+
+    _highlightActivePlayer(seatIndex) {
+        document.querySelectorAll('.player-zone').forEach(z => z.classList.remove('active-turn'));
+        const zone = this.elPlayers[seatIndex];
+        if (zone) zone.classList.add('active-turn');
+    }
+
+    _updateTheme() {
+        const theme = localStorage.getItem('tekka-theme') || 'green';
+        document.body.dataset.theme = theme;
+    }
+
+    // -------------------------------------------------------------------------
+    // MODALS
+    // -------------------------------------------------------------------------
+    _openModal(id) {
+        document.getElementById(id)?.classList.remove('hidden');
+    }
+    _closeModal(id) {
+        document.getElementById(id)?.classList.add('hidden');
+    }
+
+    _showRoundEndModal(rr, fullResult) {
+        const el = document.getElementById('modal-round-end');
+        if (!el) return;
+
+        const declarantName = this.game.players[this.game.highBidder]?.name || '';
+        const bidLabel = this._formatBid(this.game.contractAmount);
+        const made = rr.made;
+        const teamLabel = this.game.declarantTeam === 0 ? 'N/S' : 'W/E';
+        const pts = made ? rr.declarantPoints : rr.defenderPoints;
+
+        document.getElementById('round-result-title').textContent =
+            made ? `✅ Bid Made!` : `❌ Bid Failed!`;
+        document.getElementById('round-result-detail').innerHTML =
+            `${declarantName} bid <strong>${bidLabel}</strong> for Team ${teamLabel}<br>` +
+            `Tricks taken: <strong>${rr.tricksTaken}/13</strong><br>` +
+            (made ? `Team ${teamLabel} scores <strong>+${pts}</strong> pts`
+                  : `Opponents score <strong>+${pts}</strong> pts`);
+        document.getElementById('round-scores').innerHTML =
+            `<strong>Scores:</strong> N/S = ${this.game.teamScores[0]} &nbsp;|&nbsp; W/E = ${this.game.teamScores[1]}`;
+
+        this._openModal('modal-round-end');
+    }
+
+    _showGameOverModal(result) {
+        const el = document.getElementById('modal-game-over');
+        if (!el) return;
+        const winTeam = result.winner === 0 ? 'Team N/S' : 'Team W/E';
+        const isHumanTeam = result.winner === 0; // South+North wins
+        document.getElementById('gameover-title').textContent =
+            isHumanTeam ? '🏆 Your Team Wins!' : '😔 Opponents Win';
+        document.getElementById('gameover-scores').innerHTML =
+            `Final Score<br>N/S: <strong>${this.game.teamScores[0]}</strong> &nbsp;|&nbsp; W/E: <strong>${this.game.teamScores[1]}</strong>`;
+        this._openModal('modal-game-over');
+    }
+
+    _renderScoreboard() {
+        const tbody = document.getElementById('scoreboard-body');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+        this.game.roundHistory.forEach((r, i) => {
+            const tr = document.createElement('tr');
+            const declarant = this.game.players[r.declarant]?.name || '';
+            const made = r.made ? '✅' : '❌';
+            tr.innerHTML = `<td>${i + 1}</td><td>${declarant}</td><td>${this._formatBid(r.contract)}</td>
+                <td>${r.tricksTaken}</td><td>${made}</td>
+                <td>${r.teamScores[0]}</td><td>${r.teamScores[1]}</td>`;
+            tbody.appendChild(tr);
+        });
+        this._openModal('modal-scoreboard');
+    }
+
+    // -------------------------------------------------------------------------
+    // ONLINE MODAL
+    // -------------------------------------------------------------------------
+    _openOnlineModal() {
+        // Reset to create tab
+        this._switchOnlineTab('create');
+        const codeEl = document.getElementById('create-room-code');
+        if (codeEl) codeEl.value = TekkaNetwork.generateRoomCode();
+        this._openModal('modal-online');
+    }
+
+    _bindOnlineEvents() {
+        // Tab switching
+        document.getElementById('tab-create')?.addEventListener('click', () => this._switchOnlineTab('create'));
+        document.getElementById('tab-join')?.addEventListener('click', () => this._switchOnlineTab('join'));
+
+        // Password toggles
+        document.getElementById('btn-toggle-create-pwd')?.addEventListener('click', () => {
+            const inp = document.getElementById('create-room-pwd');
+            if (inp) inp.type = inp.type === 'password' ? 'text' : 'password';
+        });
+        document.getElementById('btn-toggle-join-pwd')?.addEventListener('click', () => {
+            const inp = document.getElementById('join-room-pwd');
+            if (inp) inp.type = inp.type === 'password' ? 'text' : 'password';
+        });
+
+        // Regenerate room code
+        document.getElementById('btn-regen-code')?.addEventListener('click', () => {
+            const el = document.getElementById('create-room-code');
+            if (el) el.value = TekkaNetwork.generateRoomCode();
+        });
+
+        // Create room
+        document.getElementById('btn-create-room')?.addEventListener('click', () => this._createRoom());
+
+        // Join room
+        document.getElementById('btn-join-room')?.addEventListener('click', () => this._joinRoom());
+
+        // Copy invite link
+        document.getElementById('btn-copy-link')?.addEventListener('click', () => {
+            const url = document.getElementById('lobby-invite-link')?.value;
+            if (url) {
+                navigator.clipboard.writeText(url).then(() => this.showToast('📋 Link copied!', 2000));
+            }
+        });
+
+        // Start game (host only)
+        document.getElementById('btn-start-online')?.addEventListener('click', () => this._startOnlineGame());
+
+        // Leave lobby
+        document.getElementById('btn-leave-lobby')?.addEventListener('click', () => {
+            this.net.disconnect();
+            this._switchOnlineTab('create');
+        });
+    }
+
+    _switchOnlineTab(tab) {
+        ['create', 'join', 'lobby'].forEach(t => {
+            document.getElementById(`tab-${t}`)?.classList.toggle('active', t === tab);
+            document.getElementById(`view-${t}`)?.classList.toggle('hidden', t !== tab);
+        });
+    }
+
+    _createRoom() {
+        const name = document.getElementById('create-player-name')?.value.trim() || 'Host';
+        const code = document.getElementById('create-room-code')?.value.trim().toUpperCase();
+        const pwd  = document.getElementById('create-room-pwd')?.value.trim();
+
+        if (!code) return this.showToast('Enter a room code', 2000);
+        if (!pwd)  return this.showToast('Enter a room password', 2000);
+
+        this.net.connect({ roomCode: code, password: pwd, playerName: name, isHost: true, seatIndex: SEAT.SOUTH });
+        this._setupNetworkCallbacks();
+        this._switchOnlineTab('lobby');
+        this._updateLobbyDisplay(code);
+    }
+
+    _joinRoom() {
+        const name = document.getElementById('join-player-name')?.value.trim() || 'Guest';
+        const code = document.getElementById('join-room-code')?.value.trim().toUpperCase();
+        const pwd  = document.getElementById('join-room-pwd')?.value.trim();
+
+        if (!code) return this.showToast('Enter the room code', 2000);
+        if (!pwd)  return this.showToast('Enter the room password', 2000);
+
+        this.net.connect({ roomCode: code, password: pwd, playerName: name, isHost: false });
+        this._setupNetworkCallbacks();
+        this._switchOnlineTab('lobby');
+        this._updateLobbyDisplay(code);
+    }
+
+    _updateLobbyDisplay(code) {
+        const el = document.getElementById('lobby-room-code');
+        if (el) el.textContent = code;
+        const link = this.net.buildShareLink();
+        const linkEl = document.getElementById('lobby-invite-link');
+        if (linkEl) linkEl.value = link;
+
+        const startBtn = document.getElementById('btn-start-online');
+        if (startBtn) startBtn.classList.toggle('hidden', !this.net.isHost);
+    }
+
+    _setupNetworkCallbacks() {
+        this.onlineMode = true;
+
+        this.net.onPlayerJoined = (data) => {
+            this._updateLobbySeats(data.players);
+            this.showToast(`${data.name || 'Player'} joined!`, 2000);
+        };
+
+        this.net.onGameStarted = (data) => {
+            this._closeModal('modal-online');
+            this.game.reset();
+            // Reconstruct hands from network data
+            this.game.hands = data.hands.map(h => deserializeHand(h));
+            this.game.dealer = data.dealer;
+            this.game.biddingOrder = data.biddingOrder;
+            this.game.biddingStep = 0;
+            this.game.phase = PHASE.BIDDING;
+            this.game.activePlayer = data.biddingOrder[0];
+            this._showScreen('screen-game');
+            this._resetBoard();
+            this._renderAllHands();
+            this._updateScoreDisplay();
+            this._startBidding();
+        };
+
+        this.net.onBidPlaced = (data) => {
+            this._applyBid(data.seat, data.bid);
+        };
+
+        this.net.onCardPlayed = (data) => {
+            this._applyCardPlay(data.seat, data.card);
+        };
+
+        this.net.onConnectionChange = (connected, host) => {
+            const msg = connected ? `✅ Connected to ${host}` : '❌ Disconnected';
+            this.showToast(msg, 2500);
+        };
+    }
+
+    _updateLobbySeats(players) {
+        const names = { 0: 'You (South)', 1: 'West', 2: 'North', 3: 'East' };
+        for (let i = 0; i < 4; i++) {
+            const el = document.getElementById(`lobby-seat-${i}`);
+            if (!el) continue;
+            if (players[i]) {
+                el.textContent = players[i].name;
+                el.className = 'lobby-seat filled';
+            } else {
+                el.textContent = i === SEAT.SOUTH && this.net.isHost ? 'You' : 'Waiting...';
+                el.className = 'lobby-seat empty';
+            }
+        }
+    }
+
+    _startOnlineGame() {
+        // Host deals and broadcasts
+        const deck = new Deck();
+        deck.shuffle();
+        const hands = deck.deal(4);
+        this.game.hands = hands;
+        this.game.dealer = SEAT.SOUTH;
+        this.game.biddingOrder = TekkaRules.biddingOrder(SEAT.SOUTH);
+        this.game.biddingStep = 0;
+        this.game.phase = PHASE.BIDDING;
+        this.game.activePlayer = this.game.biddingOrder[0];
+
+        this.net.sendStartGame(this.game);
+
+        this._closeModal('modal-online');
+        this._showScreen('screen-game');
+        this._resetBoard();
+        this._renderAllHands();
+        this._updateScoreDisplay();
+        this._startBidding();
+    }
+
+    // -------------------------------------------------------------------------
+    // AUTO-JOIN FROM URL
+    // -------------------------------------------------------------------------
+    _checkAutoJoin() {
+        try {
+            const params = new URLSearchParams(window.location.search);
+            const room = params.get('room');
+            const pwd  = params.get('pwd');
+            const b    = params.get('b');
+
+            if (room) {
+                if (b !== null) this.net._pendingBrokerIndex = parseInt(b) || 0;
+                setTimeout(() => {
+                    // Pre-fill join form and open modal
+                    const nameEl = document.getElementById('join-player-name');
+                    const codeEl = document.getElementById('join-room-code');
+                    const pwdEl  = document.getElementById('join-room-pwd');
+                    if (nameEl) { nameEl.value = ''; nameEl.placeholder = 'Enter your name…'; }
+                    if (codeEl) codeEl.value = room;
+                    if (pwdEl && pwd) pwdEl.value = pwd;
+                    this._switchOnlineTab('join');
+                    this._openModal('modal-online');
+                    this.showToast(`📨 Invited to room ${room}! Enter your name to join.`, 5000);
+                }, 500);
+            }
+        } catch (e) {}
+    }
+
+    // -------------------------------------------------------------------------
+    // TOAST
+    // -------------------------------------------------------------------------
+    showToast(msg, duration = 2500) {
+        if (!this.elToast) return;
+        clearTimeout(this.toastTimer);
+        this.elToast.textContent = msg;
+        this.elToast.classList.remove('hidden');
+        this.toastTimer = setTimeout(() => this.elToast.classList.add('hidden'), duration);
+    }
+}
+
+/* === app.js === */
+/* === Tekka Card Game: app.js === */
+'use strict';
+
+document.addEventListener('DOMContentLoaded', () => {
+    window.tekkaGame    = new TekkaGame();
+    window.tekkaNetwork = new TekkaNetwork();
+    window.tekkaUI      = new TekkaUI(window.tekkaGame, window.tekkaNetwork);
+    window.tekkaUI.init();
+});
+
+</script>
+
+
+
+
+
+
+
+
+<script>
+// Settings persistence
+document.addEventListener('DOMContentLoaded', () => {
+    const themeEl = document.getElementById('setting-theme');
+    const saved = localStorage.getItem('tekka-theme') || 'green';
+    if (themeEl) { themeEl.value = saved; document.body.dataset.theme = saved; }
+    themeEl?.addEventListener('change', (e) => {
+        document.body.dataset.theme = e.target.value;
+        localStorage.setItem('tekka-theme', e.target.value);
+    });
+
+    // Fix bot hand rendering — link hand zones to player zones
+    const northHand = document.getElementById('hand-north');
+    const westHand  = document.getElementById('hand-west');
+    const eastHand  = document.getElementById('hand-east');
+    if (northHand) northHand.className = 'bot-hand';
+    if (westHand)  westHand.className  = 'bot-hand';
+    if (eastHand)  eastHand.className  = 'bot-hand';
+});
+</script>
 
 </body>
 </html>
