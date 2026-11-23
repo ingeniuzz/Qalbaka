@@ -753,29 +753,46 @@ html, body {
 /* Online In-Game HUD & Reaction Bar */
 .online-hud {
     position: absolute;
-    top: 55px;
-    right: 18px;
-    background: rgba(15, 23, 42, 0.9);
+    top: 50px;
+    right: 12px;
+    background: rgba(15, 23, 42, 0.92);
     backdrop-filter: blur(8px);
     border: 1px solid rgba(59, 130, 246, 0.4);
-    border-radius: 12px;
-    padding: 0.5rem 0.75rem;
+    border-radius: 10px;
+    padding: 0.35rem 0.65rem;
     display: flex;
     flex-direction: column;
-    gap: 0.4rem;
+    gap: 0.35rem;
     z-index: 45;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
     animation: fadeIn 0.3s ease-out;
+    max-width: 90vw;
 }
 
 .online-room-badge {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-    font-size: 0.8rem;
+    gap: 0.45rem;
+    font-size: 0.78rem;
     font-weight: 800;
     color: #e2e8f0;
+}
+
+.btn-toggle-chat {
+    background: rgba(59, 130, 246, 0.25);
+    border: 1px solid rgba(59, 130, 246, 0.5);
+    color: #93c5fd;
+    border-radius: 6px;
+    padding: 0.2rem 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.btn-toggle-chat:hover {
+    background: rgba(59, 130, 246, 0.45);
+    color: #ffffff;
 }
 
 .online-indicator-dot {
@@ -797,6 +814,9 @@ html, body {
     display: flex;
     align-items: center;
     gap: 0.3rem;
+    flex-wrap: wrap;
+    padding-top: 0.25rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .btn-emote {
@@ -1312,23 +1332,28 @@ html, body {
     .online-hud {
         top: 46px;
         right: 4px;
-        padding: 0.25rem 0.45rem;
+        padding: 0.2rem 0.45rem;
         border-radius: 8px;
-        max-width: 175px;
+        max-width: 95vw;
     }
     .online-room-badge {
+        font-size: 0.68rem;
+        gap: 0.35rem;
+    }
+    .btn-toggle-chat {
+        padding: 0.15rem 0.4rem;
         font-size: 0.68rem;
     }
     .emote-bar {
         gap: 2px;
     }
     .btn-emote {
-        width: 22px;
-        height: 22px;
-        font-size: 0.8rem;
+        width: 24px;
+        height: 24px;
+        font-size: 0.85rem;
     }
     .chat-input-wrapper input {
-        width: 55px;
+        width: 65px;
         font-size: 0.68rem;
         padding: 0.15rem 0.3rem;
     }
@@ -1416,6 +1441,7 @@ html, body {
 
 
 
+
     <!-- Lucide icons or SVG equivalents -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1490,9 +1516,10 @@ html, body {
                 <div class="online-room-badge">
                     <span class="online-indicator-dot"></span>
                     <span id="hud-room-code">Room: HEARTS-XXXX</span>
-                    <button id="btn-hud-copy" class="btn-mini" title="Copy Invite Link">ðŸ“‹ Link</button>
+                    <button id="btn-hud-copy" class="btn-mini" title="Copy Invite Link">📋 Link</button>
+                    <button id="btn-toggle-chat-panel" class="btn-toggle-chat" title="Toggle Chat & Emotes">💬 Chat</button>
                 </div>
-                <div class="emote-bar">
+                <div id="hud-chat-drawer" class="emote-bar hidden">
                     <button class="btn-emote" data-emote="ðŸ‘" title="Thumbs Up">ðŸ‘</button>
                     <button class="btn-emote" data-emote="ðŸ˜‚" title="Laugh">ðŸ˜‚</button>
                     <button class="btn-emote" data-emote="ðŸ’”" title="Broken Heart">ðŸ’”</button>
@@ -2039,6 +2066,7 @@ html, body {
     </script>
 
     <!-- Scripts (Ordered cleanly so no CORS or bundling is required!) -->
+    
     
     
     
@@ -4093,7 +4121,7 @@ class HeartsNetwork {
                 if (this.onGameStarted) this.onGameStarted(data);
                 return;
             } else if (data.type === 'round_dealt') {
-                if (data.targetSeat === this.mySeatIndex) {
+                if (!data.targetSeat || data.targetSeat == this.mySeatIndex || data.hands) {
                     if (this.onRoundDealt) this.onRoundDealt(data);
                 }
                 return;
@@ -5131,24 +5159,23 @@ class TableUI {
 
         game.onStateChange = (event, data) => {
             if (event === 'dealing') {
-                // Host sends each connected guest their private hand
+                // Host sends connected guests dealt hands
                 if (window.heartsNetwork && window.heartsNetwork.isHost && window.heartsNetwork.isConnected) {
-                    const guests = Object.values(window.heartsNetwork.connectedGuests || {});
-                    guests.forEach(guest => {
-                        const seat = guest.seatIndex;
-                        if (this.game && this.game.players && this.game.players[seat]) {
-                            const guestHand = this.game.players[seat].hand.map(c => ({ suit: c.suit, rank: c.rank, id: c.id }));
-                            window.heartsNetwork.sendToGuest(seat, {
-                                type: 'round_dealt',
-                                myHand: guestHand,
-                                passDirection: this.game.passDirection,
-                                passStage: this.game.passStage,
-                                gameMode: this.game.gameMode,
-                                roundNumber: this.game.roundNumber,
-                                scores: this.game.players.map(p => p.totalScore),
-                                playerNames: this.game.players.map(p => p.name)
-                            });
+                    const allHands = {};
+                    for (let s = 0; s < 4; s++) {
+                        if (this.game && this.game.players && this.game.players[s]) {
+                            allHands[s] = this.game.players[s].hand.map(c => ({ suit: c.suit, rank: c.rank, id: c.id }));
                         }
+                    }
+                    window.heartsNetwork.broadcastToGuests({
+                        type: 'round_dealt',
+                        hands: allHands,
+                        passDirection: this.game.passDirection,
+                        passStage: this.game.passStage,
+                        gameMode: this.game.gameMode,
+                        roundNumber: this.game.roundNumber,
+                        scores: this.game.players.map(p => p.totalScore),
+                        playerNames: this.game.players.map(p => p.name)
                     });
                 }
             } else if (event === 'turn_start' && this.game.currentPhase === HeartsGame.PHASES.PLAYING) {
@@ -5606,7 +5633,8 @@ class TableUI {
         // Online Guest routing
         if (window.heartsNetwork && window.heartsNetwork.isConnected && !window.heartsNetwork.isHost) {
             // Passing phase for Online Guest
-            if (this.onlineIsPassingPhase) {
+            const isPassing = this.onlineIsPassingPhase || (this.onlinePassDirection && this.onlinePassDirection !== 'hold');
+            if (isPassing) {
                 if (window.soundEngine) window.soundEngine.playCardSelect();
                 if (this.selectedPassCardIds.has(card.id)) {
                     this.selectedPassCardIds.delete(card.id);
@@ -5614,7 +5642,7 @@ class TableUI {
                     if (this.selectedPassCardIds.size < 3) {
                         this.selectedPassCardIds.add(card.id);
                     } else {
-                        this.showToast('You can only pass 3 cards. Click a selected card to unselect it.');
+                        this.showToast('You can only pass 3 cards. Tap a selected card to unselect it.');
                     }
                 }
                 this.renderOnlineGuestHand();
@@ -6186,19 +6214,30 @@ class TableUI {
                 if (this.hudRoomCodeEl) this.hudRoomCodeEl.textContent = `Room: ${window.heartsNetwork.roomCode}`;
             }
 
-            // Broadcast game start to all connected guests
+            // Start game on Host so cards are dealt immediately
+            onlineGame.startNewGame();
+
+            // Collect all hands to broadcast atomically with game_start
+            const allHands = {};
+            for (let s = 0; s < 4; s++) {
+                if (onlineGame.players[s] && onlineGame.players[s].hand) {
+                    allHands[s] = onlineGame.players[s].hand.map(c => ({ suit: c.suit, rank: c.rank, id: c.id }));
+                }
+            }
+
+            // Broadcast game start WITH ALL HANDS directly to all connected guests
             window.heartsNetwork.broadcastToGuests({
                 type: 'game_start',
                 gameMode,
                 humanSeats,
                 playerNames,
-                playerAvatars
+                playerAvatars,
+                passDirection: onlineGame.passDirection,
+                passStage: onlineGame.passStage,
+                roundNumber: onlineGame.roundNumber,
+                scores: onlineGame.players.map(p => p.totalScore),
+                hands: allHands
             });
-
-            // Delay dealing slightly (250ms) to ensure game_start arrives at all devices first
-            setTimeout(() => {
-                onlineGame.startNewGame();
-            }, 250);
         });
 
         // Leave Lobby Action
@@ -6209,12 +6248,19 @@ class TableUI {
             this.showToast('You left the room.');
         });
 
+        // Toggle Chat & Emote Drawer in Online HUD
+        document.getElementById('btn-toggle-chat-panel')?.addEventListener('click', () => {
+            const drawer = document.getElementById('hud-chat-drawer');
+            drawer?.classList.toggle('hidden');
+        });
+
         // Emote buttons
         document.querySelectorAll('.btn-emote').forEach(btn => {
             btn.addEventListener('click', () => {
                 const emote = btn.getAttribute('data-emote');
                 if (emote) {
                     window.heartsNetwork.sendEmote(emote);
+                    document.getElementById('hud-chat-drawer')?.classList.add('hidden');
                 }
             });
         });
@@ -6226,6 +6272,7 @@ class TableUI {
             if (text) {
                 window.heartsNetwork.sendChatMessage(text);
                 this.hudChatInput.value = '';
+                document.getElementById('hud-chat-drawer')?.classList.add('hidden');
             }
         };
 
@@ -6331,7 +6378,7 @@ class TableUI {
             this.onlinePlayerNames = data.playerNames;
             this.onlinePlayerAvatars = data.playerAvatars;
             this.onlineGameMode = data.gameMode;
-            this.onlineMySeat = net.mySeatIndex;
+            this.onlineMySeat = net.mySeatIndex || 1;
 
             // Perspective rotation: Guest sits at South (Bottom)!
             this.setViewingPlayer(this.onlineMySeat);
@@ -6342,7 +6389,45 @@ class TableUI {
                 if (this.hudRoomCodeEl) this.hudRoomCodeEl.textContent = `Room: ${net.roomCode} (Guest)`;
             }
 
-            this.updateOnlinePlayerBadges();
+            // Immediately initialize passing phase and guest cards!
+            this.onlinePassDirection = data.passDirection;
+            this.onlinePassStage = data.passStage || 1;
+            this.onlineRoundNumber = data.roundNumber || 1;
+            this.onlineIsPassingPhase = data.passDirection && data.passDirection !== 'hold';
+            this.onlineCurrentTrick = [];
+            this.selectedPassCardIds.clear();
+
+            if (data.hands) {
+                const myHandCards = data.hands[this.onlineMySeat] || data.hands[1] || [];
+                this.onlineGuestHand = myHandCards.map(c => new Card(c.suit, c.rank));
+            }
+
+            this.updateOnlinePlayerBadges(data.scores);
+            this.renderOnlineGuestHand();
+            this.renderOnlineStationCardCounts(13);
+
+            if (this.centerTrickEl) this.centerTrickEl.innerHTML = '';
+
+            if (this.onlineIsPassingPhase) {
+                if (this.passControlsEl) {
+                    this.passControlsEl.classList.remove('hidden');
+                    if (this.passDirectionText) {
+                        const dirLabel = data.gameMode === 'triple-pass'
+                            ? HeartsRules.getTriplePassLabel(this.onlinePassStage)
+                            : HeartsRules.getPassDirectionLabel(this.onlinePassDirection);
+                        this.passDirectionText.textContent = dirLabel;
+                    }
+                    if (this.btnConfirmPass) {
+                        this.btnConfirmPass.disabled = true;
+                        this.btnConfirmPass.textContent = 'Pass 3 Cards (0/3)';
+                    }
+                }
+                if (this.statusBannerEl) this.statusBannerEl.textContent = `Passing Phase: Select 3 cards to pass!`;
+            } else {
+                if (this.passControlsEl) this.passControlsEl.classList.add('hidden');
+            }
+
+            if (window.soundEngine) window.soundEngine.playCardDeal();
             this.showToast(`Game Started by Host! Game Mode: ${data.gameMode === 'triple-pass' ? 'Triple Pass' : 'Classic'}.`, 3500);
         };
 
@@ -6354,15 +6439,18 @@ class TableUI {
                 if (this.hudRoomCodeEl) this.hudRoomCodeEl.textContent = `Room: ${net.roomCode} (Guest)`;
             }
             if (data.playerNames) this.onlinePlayerNames = data.playerNames;
-            if (this.currentViewingPlayerIndex !== net.mySeatIndex) {
-                this.setViewingPlayer(net.mySeatIndex);
+            if (data.playerAvatars) this.onlinePlayerAvatars = data.playerAvatars;
+            const mySeat = net.mySeatIndex || 1;
+            if (this.currentViewingPlayerIndex !== mySeat) {
+                this.setViewingPlayer(mySeat);
             }
 
-            this.onlineGuestHand = data.myHand.map(c => new Card(c.suit, c.rank));
+            const rawCards = (data.hands && (data.hands[mySeat] || data.hands[1])) || data.myHand || [];
+            this.onlineGuestHand = rawCards.map(c => new Card(c.suit, c.rank));
             this.onlinePassDirection = data.passDirection;
-            this.onlinePassStage = data.passStage;
-            this.onlineRoundNumber = data.roundNumber;
-            this.onlineIsPassingPhase = data.passDirection !== 'hold';
+            this.onlinePassStage = data.passStage || 1;
+            this.onlineRoundNumber = data.roundNumber || 1;
+            this.onlineIsPassingPhase = data.passDirection && data.passDirection !== 'hold';
             this.onlineCurrentTrick = [];
             this.selectedPassCardIds.clear();
 
@@ -6377,8 +6465,8 @@ class TableUI {
                     this.passControlsEl.classList.remove('hidden');
                     if (this.passDirectionText) {
                         const dirLabel = data.gameMode === 'triple-pass'
-                            ? HeartsRules.getTriplePassLabel(data.passStage)
-                            : HeartsRules.getPassDirectionLabel(data.passDirection);
+                            ? HeartsRules.getTriplePassLabel(this.onlinePassStage)
+                            : HeartsRules.getPassDirectionLabel(this.onlinePassDirection);
                         this.passDirectionText.textContent = dirLabel;
                     }
                     if (this.btnConfirmPass) {
@@ -6749,12 +6837,17 @@ class TableUI {
 
             if (roomParam) {
                 setTimeout(() => {
-                    this.showOnlineModal({
-                        tab: 'join',
+                    this.showOnlineModal({ tab: 'lobby' });
+                    const statusEl = document.getElementById('lobby-status-banner');
+                    if (statusEl) statusEl.textContent = `Connecting to room ${roomParam}...`;
+
+                    window.heartsNetwork.joinRoom({
                         roomCode: roomParam,
-                        password: pwdParam || ''
+                        password: pwdParam || '',
+                        playerName: 'Friend',
+                        brokerIndex: brokerParam !== null ? parseInt(brokerParam) : 0
                     });
-                    this.showToast('Online room invite detected! Ready to join.', 4000);
+                    this.showToast(`Joining Room ${roomParam}...`, 3500);
                 }, 400);
             }
         } catch (e) {}
