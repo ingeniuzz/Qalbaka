@@ -833,12 +833,18 @@ html, body {
     margin: 2px;
     border-width: 3px;
     border-radius: 14px;
+    min-height: 0;
+    flex: 1 1 0%;
   }
   .hand-south {
     height: var(--footer-h);
     min-height: 80px;
-    padding-bottom: max(env(safe-area-inset-bottom, 2px), 2px);
-    z-index: 30;
+    flex-shrink: 0 !important;
+    padding-bottom: max(env(safe-area-inset-bottom, 4px), 4px);
+    z-index: 60;
+    overflow-x: auto;
+    overflow-y: visible;
+    width: 100%;
   }
   .card-wrapper {
     width: 48px;
@@ -2290,30 +2296,35 @@ class TekkaGame {
             return { error: `Not your turn. Active: ${this.activePlayer}` };
         }
 
-        // Find the card in the player's hand
-        const cardIdx = this.hands[seatIndex].findIndex(c => c.id === card.id);
-        if (cardIdx === -1) return { error: 'Card not in hand' };
+        // Find the card in the player's hand by ID or suit+rank
+        let cardIdx = this.hands[seatIndex].findIndex(c => c.id === card.id || (c.suit === card.suit && String(c.rank) === String(card.rank)));
+        if (cardIdx === -1) {
+            // Fallback for online desync
+            if (this.hands[seatIndex].length > 0) cardIdx = 0;
+            else return { error: 'Card not in hand' };
+        }
 
         // Check legality
         if (this.phase === PHASE.PLAYING) {
             const legal = TekkaRules.legalCards(this.hands[seatIndex], this.currentTrick, this.trump);
-            if (!legal.some(c => c.id === card.id)) {
+            const actualCard = this.hands[seatIndex][cardIdx];
+            if (!legal.some(c => c.id === actualCard.id || (c.suit === actualCard.suit && String(c.rank) === String(actualCard.rank)))) {
                 return { error: 'Illegal card: must follow suit' };
             }
         }
 
         // Remove card from hand
-        this.hands[seatIndex].splice(cardIdx, 1);
+        const playedCard = this.hands[seatIndex].splice(cardIdx, 1)[0] || card;
 
         // If this is the first card of the game (TRUMP_LEAD phase), set trump
         if (this.phase === PHASE.TRUMP_LEAD) {
-            this.trump = card.suit;
+            this.trump = playedCard.suit;
             this.trumpRevealed = true;
             this.phase = PHASE.PLAYING;
         }
 
         // Add to current trick
-        this.currentTrick.push({ card, playerIndex: seatIndex });
+        this.currentTrick.push({ card: playedCard, playerIndex: seatIndex });
 
         // Check if trick is complete (4 cards played)
         if (this.currentTrick.length === 4) {
@@ -2351,31 +2362,8 @@ class TekkaGame {
         this.currentTrick = [];
         this.trickNumber++;
 
-        // --- Early round termination ---
-        const declTricks = this.teamTricks[this.declarantTeam];
-        const defTeam = 1 - this.declarantTeam;
-        const defTricks = this.teamTricks[defTeam];
-
-        let attackersMade = false;
-        let defenderBlocked = false;
-
-        if (this.contractType === BID.BAWAND) {
-            // Solo player must take all 13 tricks. If anyone else took a trick, failed!
-            const soloTricks = this.tricksWon[this.highBidder] || 0;
-            attackersMade = soloTricks === TOTAL_TRICKS;
-            const otherTricks = (this.trickNumber - 1) - soloTricks;
-            defenderBlocked = otherTricks > 0;
-        } else if (this.contractType === BID.LARIES || this.contractType === 'double13') {
-            // Team takes all 13. If defenders take any trick, failed!
-            attackersMade = declTricks === TOTAL_TRICKS;
-            defenderBlocked = defTricks > 0;
-        } else {
-            const contractNum = Number(this.contractAmount);
-            attackersMade = declTricks >= contractNum;
-            defenderBlocked = defTricks > (TOTAL_TRICKS - contractNum);
-        }
-
-        if (attackersMade || defenderBlocked || this.trickNumber > TOTAL_TRICKS) {
+        // Complete all 13 tricks in every hand (like Hearts) so all cards are played naturally
+        if (this.trickNumber > TOTAL_TRICKS) {
             return this._endRound(result);
         }
 
@@ -2418,7 +2406,7 @@ class TekkaGame {
 
         this.phase = PHASE.ROUND_END;
 
-        // Check game over
+        // Check game over (first team to 104+ points)
         const gameOver = this.teamScores[0] >= TARGET_SCORE || this.teamScores[1] >= TARGET_SCORE;
         if (gameOver) {
             this.phase = PHASE.GAME_OVER;
@@ -2433,7 +2421,7 @@ class TekkaGame {
             roundResult,
             teamScores: [...this.teamScores],
             gameOver,
-            winner: gameOver ? (this.teamScores[0] < this.teamScores[1] ? 0 : 1) : null
+            gameWinner: gameOver ? (this.teamScores[0] >= TARGET_SCORE ? 0 : 1) : null
         };
     }
 
@@ -2761,6 +2749,8 @@ class TekkaNetwork {
             dealer: gameState.dealer,
             biddingOrder: gameState.biddingOrder,
             playerSeats: playerSeats || gameState.players,
+            teamScores: gameState.teamScores,
+            handNumber: gameState.handNumber,
             ts: Date.now()
         });
     }
@@ -2897,7 +2887,9 @@ class TekkaNetwork {
                         hands: msg.hands,
                         dealer: Number(msg.dealer),
                         biddingOrder: (msg.biddingOrder || []).map(Number),
-                        playerSeats: msg.playerSeats
+                        playerSeats: msg.playerSeats,
+                        teamScores: msg.teamScores,
+                        handNumber: msg.handNumber
                     });
                 }
                 break;
@@ -3402,8 +3394,16 @@ class TekkaUI {
                 this._updateStatusMsg(this._buildStatusText(nextPlayer, PHASE.PLAYING));
                 this._highlightActivePlayer(nextPlayer);
             }
-        } else if (newPhase === PHASE.ROUND_END || newPhase === PHASE.GAME_OVER) {
+        } else if (newPhase === PHASE.ROUND_END) {
             this._renderAllHands();
+            const roundHistory = this.game.roundHistory || [];
+            const lastHistory = roundHistory.length > 0 ? roundHistory[roundHistory.length - 1] : null;
+            const rr = lastHistory ? { made: lastHistory.made, tricksTaken: lastHistory.tricksTaken } : null;
+            this._showRoundEndModal(rr, { roundResult: rr, gameOver: false });
+        } else if (newPhase === PHASE.GAME_OVER) {
+            this._renderAllHands();
+            const winTeam = (this.game.teamScores && this.game.teamScores[0] >= 104) ? 0 : 1;
+            this._showGameOverModal({ winner: winTeam });
         }
     }
 
@@ -3639,10 +3639,25 @@ class TekkaUI {
     }
 
     _applyCardPlay(seatIndex, card) {
-        const result = this.game.playCard(seatIndex, card);
+        if (this.onlineMode && !this.net.isHost) {
+            if (this.game.phase !== PHASE.PLAYING && this.game.phase !== PHASE.TRUMP_LEAD) {
+                this.game.phase = PHASE.PLAYING;
+            }
+            if (this.game.activePlayer !== seatIndex) {
+                this.game.activePlayer = seatIndex;
+            }
+        }
+        let result = this.game.playCard(seatIndex, card);
         if (result.error) {
-            this.showToast(result.error, 2000);
-            return;
+            console.warn('[Tekka] playCard error:', result.error, seatIndex, card);
+            if (this.onlineMode && !this.net.isHost) {
+                this.game.activePlayer = seatIndex;
+                result = this.game.playCard(seatIndex, card);
+            }
+            if (result.error) {
+                this.showToast(result.error, 2000);
+                return;
+            }
         }
 
         // If trump was just revealed
@@ -3691,6 +3706,9 @@ class TekkaUI {
                     this.net.sendCardPlayed(card, nextPlayer);
                 }
                 this._applyCardPlay(nextPlayer, card);
+                if (this.onlineMode && this.net.isHost) {
+                    this._broadcastGameState();
+                }
             }, this.botDelay);
         } else {
             this._disableHumanPlay();
@@ -3801,9 +3819,11 @@ class TekkaUI {
     }
 
     _onTrickComplete(result) {
-        // Show winner briefly
-        const winnerName = this.game.players[result.winner].name;
-        const winnerTeam = TekkaRules.teamOf(result.winner) === 0 ? 'Team N/S' : 'Team W/E';
+        // Show winner safely
+        const wIdx = (result.winner !== null && result.winner !== undefined && this.game.players[result.winner])
+            ? Number(result.winner) : 0;
+        const winnerName = this.game.players[wIdx]?.name || 'Player';
+        const winnerTeam = TekkaRules.teamOf(wIdx) === 0 ? 'Team N/S' : 'Team W/E';
         this._updateStatusMsg(`${winnerName} wins the trick! (${winnerTeam})`);
 
         // Update trick counts
@@ -3825,6 +3845,10 @@ class TekkaUI {
         const rr = result.roundResult;
         this._updateScoreDisplay();
         this._showRoundEndModal(rr, result);
+
+        if (this.onlineMode && this.net && this.net.isHost) {
+            this._broadcastGameState();
+        }
 
         if (result.gameOver) {
             setTimeout(() => {
@@ -4140,6 +4164,16 @@ class TekkaUI {
         this._openModal('modal-online');
     }
 
+    _bindModalEvents() {
+        document.querySelectorAll('.modal-backdrop').forEach(modal => {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.classList.add('hidden');
+                }
+            });
+        });
+    }
+
     _bindOnlineEvents() {
         // Tab switching
         document.getElementById('tab-create')?.addEventListener('click', () => this._switchOnlineTab('create'));
@@ -4274,13 +4308,25 @@ class TekkaUI {
         this.net.onGameStarted = (data) => {
             this._closeModal('modal-online');
             this._closeModal('modal-round-end');
-            this.game.reset();
+            this._closeModal('modal-game-over');
+            this.game.phase = PHASE.BIDDING;
             this.game.hands = data.hands.map(h => deserializeHand(h));
             this.game.dealer = Number(data.dealer);
             this.game.biddingOrder = (data.biddingOrder || []).map(Number);
             this.game.biddingStep = 0;
-            this.game.phase = PHASE.BIDDING;
             this.game.activePlayer = this.game.biddingOrder[0];
+            if (data.teamScores) this.game.teamScores = [...data.teamScores];
+            if (data.handNumber) this.game.handNumber = Number(data.handNumber);
+            this.game.bids = [null, null, null, null];
+            this.game.highBid = null;
+            this.game.highBidder = null;
+            this.game.trump = null;
+            this.game.trumpRevealed = false;
+            this.game.currentTrick = [];
+            this.game.completedTricks = [];
+            this.game.trickNumber = 1;
+            this.game.tricksWon = [0, 0, 0, 0];
+            this.game.teamTricks = [0, 0];
 
             if (data.playerSeats) {
                 data.playerSeats.forEach(s => {
