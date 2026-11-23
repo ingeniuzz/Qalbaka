@@ -2253,7 +2253,15 @@ class TekkaGame {
         const declarantSeat = this.highBidder;
         this.declarantTeam = TekkaRules.teamOf(declarantSeat);
         this.contractAmount = this.highBid;
-        this.contractType = this.highBid === BID.DOUBLE13 ? BID.DOUBLE13 : 'normal';
+        // Correctly identify contract type for BAWAND, LARIES/DOUBLE13, or normal numeric bid
+        const hb = this.highBid;
+        if (hb === BID.BAWAND || hb === 'bawand') {
+            this.contractType = BID.BAWAND;
+        } else if (hb === BID.LARIES || hb === 'laries' || hb === BID.DOUBLE13 || hb === 'double13') {
+            this.contractType = BID.LARIES;
+        } else {
+            this.contractType = 'normal';
+        }
 
         // Declarant leads first (this reveals the trump)
         this.phase = PHASE.TRUMP_LEAD;
@@ -2558,7 +2566,7 @@ class TekkaGame {
 'use strict';
 
 /**
- * TekkaNetwork — MQTT-based online multiplayer for Tekka.
+ * TekkaNetwork â€” MQTT-based online multiplayer for Tekka.
  * Uses public MQTT brokers over WebSockets (same approach as Qalbaka/Hearts).
  * Message types: join, bid, play, state, chat, leave, start, seat_assign
  */
@@ -2757,6 +2765,21 @@ class TekkaNetwork {
         });
     }
 
+    sendBidProcessed(bidSeat, bid, gamePhase, nextBidder, declarant, forcedEight) {
+        // Host broadcasts to all after processing a bid
+        this._publish('game', {
+            type: 'bid_processed',
+            from: this.mySeatIndex,
+            bidSeat: Number(bidSeat),
+            bid,
+            gamePhase,
+            nextBidder: nextBidder !== null && nextBidder !== undefined ? Number(nextBidder) : null,
+            declarant: declarant !== null && declarant !== undefined ? Number(declarant) : null,
+            forcedEight: !!forcedEight,
+            ts: Date.now()
+        });
+    }
+
     sendLobbyState(seats) {
         this._publish('lobby', {
             type: 'lobby_state',
@@ -2880,8 +2903,23 @@ class TekkaNetwork {
                 break;
 
             case 'bid':
+                // HOST receives guest bids; GUEST receives host bid-echo (senderId filter handles own echo)
                 if (this.onBidPlaced) {
                     this.onBidPlaced({ seat: Number(msg.seat), bid: msg.bid });
+                }
+                break;
+
+            case 'bid_processed':
+                // GUEST receives host-processed bid results
+                if (msg.from !== this.mySeatIndex && this.onBidProcessed) {
+                    this.onBidProcessed({
+                        bidSeat: Number(msg.bidSeat),
+                        bid: msg.bid,
+                        gamePhase: msg.gamePhase,
+                        nextBidder: (msg.nextBidder !== null && msg.nextBidder !== undefined) ? Number(msg.nextBidder) : null,
+                        declarant: (msg.declarant !== null && msg.declarant !== undefined) ? Number(msg.declarant) : null,
+                        forcedEight: !!msg.forcedEight
+                    });
                 }
                 break;
 
@@ -2971,6 +3009,7 @@ class TekkaNetwork {
         return `${origin}${path}?room=${this.roomCode}&pwd=${pwd}&b=${brokerIndex}`;
     }
 }
+
 
 /* === ui.js === */
 /* === Tekka Card Game: ui.js === */
@@ -3245,6 +3284,130 @@ class TekkaUI {
         this._startBidding();
     }
 
+    // HOST ONLY: Broadcast the full serialized game state to the guest after each significant event
+    _broadcastGameState() {
+        if (!this.net || !this.net.isHost) return;
+        try {
+            const state = {
+                phase: this.game.phase,
+                bids: [...this.game.bids],
+                highBid: this.game.highBid,
+                highBidder: this.game.highBidder,
+                biddingStep: this.game.biddingStep,
+                biddingOrder: [...this.game.biddingOrder],
+                currentBidder: this.game.currentBidder,
+                forcedEight: this.game.forcedEight,
+                declarantTeam: this.game.declarantTeam,
+                contractAmount: this.game.contractAmount,
+                contractType: this.game.contractType,
+                activePlayer: this.game.activePlayer,
+                trump: this.game.trump,
+                teamTricks: [...this.game.teamTricks],
+                tricksWon: [...this.game.tricksWon],
+                trickNumber: this.game.trickNumber,
+                teamScores: [...this.game.teamScores],
+                currentTrick: this.game.currentTrick.map(e => ({
+                    card: { suit: e.card.suit, rank: e.card.rank },
+                    playerIndex: e.playerIndex
+                })),
+                hands: this.game.hands.map(h => h.map(c => ({ suit: c.suit, rank: c.rank })))
+            };
+            this.net.sendStateSync(state);
+        } catch(e) {
+            console.warn('[Tekka] _broadcastGameState error:', e);
+        }
+    }
+
+    // GUEST ONLY: apply state snapshot broadcast by the host
+    _applyStateSyncFromHost(state) {
+        if (!state) return;
+        const prevPhase = this.game.phase;
+        const prevBiddingStep = this.game.biddingStep;
+
+        // Apply all game state fields
+        this.game.phase = state.phase;
+        this.game.bids = state.bids || [null, null, null, null];
+        this.game.highBid = state.highBid !== undefined ? state.highBid : null;
+        this.game.highBidder = state.highBidder !== undefined ? state.highBidder : null;
+        this.game.biddingStep = state.biddingStep !== undefined ? Number(state.biddingStep) : 0;
+        this.game.biddingOrder = (state.biddingOrder || []).map(Number);
+        this.game.forcedEight = !!state.forcedEight;
+        this.game.declarantTeam = state.declarantTeam !== undefined ? state.declarantTeam : null;
+        this.game.contractAmount = state.contractAmount !== undefined ? state.contractAmount : null;
+        this.game.contractType = state.contractType || null;
+        this.game.activePlayer = state.activePlayer !== undefined ? Number(state.activePlayer) : null;
+        this.game.trump = state.trump || null;
+        this.game.teamTricks = state.teamTricks || [0, 0];
+        this.game.tricksWon = state.tricksWon || [0, 0, 0, 0];
+        this.game.trickNumber = state.trickNumber || 1;
+        this.game.teamScores = state.teamScores || [0, 0];
+
+        // Restore hands (reconstruct Card objects)
+        if (state.hands) {
+            this.game.hands = state.hands.map(h => deserializeHand(h));
+        }
+
+        // Restore current trick
+        if (state.currentTrick) {
+            this.game.currentTrick = state.currentTrick.map(e => ({
+                card: deserializeCard(e.card),
+                playerIndex: Number(e.playerIndex)
+            }));
+        }
+
+        // Update trump display if trump changed
+        if (state.trump) {
+            this._updateTrumpDisplay();
+        }
+
+        this._updateScoreDisplay();
+        this._updateTrickCounts();
+
+        const newPhase = state.phase;
+
+        if (newPhase === PHASE.BIDDING) {
+            this._showBidOverlay();
+            for (let i = 0; i < 4; i++) {
+                if (state.bids && state.bids[i] !== null) {
+                    this._showPlayerBid(i, state.bids[i]);
+                }
+            }
+            this._runBiddingTurn();
+        } else if (newPhase === PHASE.TRUMP_LEAD) {
+            this._hideBidOverlay();
+            for (let i = 0; i < 4; i++) {
+                if (state.bids && state.bids[i] !== null) {
+                    this._showPlayerBid(i, state.bids[i]);
+                }
+            }
+            const fakeResult = {
+                phase: PHASE.TRUMP_LEAD,
+                declarant: Number(state.highBidder),
+                bid: state.highBid,
+                bidType: state.contractType,
+                forcedEight: !!state.forcedEight
+            };
+            this._onBiddingComplete(fakeResult);
+        } else if (newPhase === PHASE.PLAYING) {
+            this._hideBidOverlay();
+            this._renderAllHands();
+            this._updateTrumpDisplay();
+            this._updateContractDisplay();
+            const mySeat = this._getMySeat();
+            const nextPlayer = Number(state.activePlayer);
+            if (nextPlayer === mySeat) {
+                this._enableHumanPlay();
+            } else {
+                this._disableHumanPlay();
+                this._updateStatusMsg(this._buildStatusText(nextPlayer, PHASE.PLAYING));
+                this._highlightActivePlayer(nextPlayer);
+            }
+        } else if (newPhase === PHASE.ROUND_END || newPhase === PHASE.GAME_OVER) {
+            this._renderAllHands();
+        }
+    }
+
+
     // -------------------------------------------------------------------------
     // BIDDING
     // -------------------------------------------------------------------------
@@ -3332,6 +3495,11 @@ class TekkaUI {
         // Update player badge to show bid
         this._showPlayerBid(seatIndex, bid);
 
+        // After processing a bid online (host only), broadcast the full updated state to guest
+        if (this.onlineMode && this.net && this.net.isHost) {
+            this._broadcastGameState();
+        }
+
         if (result.phase === PHASE.TRUMP_LEAD) {
             // Bidding ended — show result
             this._onBiddingComplete(result);
@@ -3395,8 +3563,20 @@ class TekkaUI {
                 const s = Number(forSeat);
                 if (this.onlineMode) {
                     this.net.sendBid(bid, s);
+                    // If I am the host, also apply locally (host drives the game).
+                    // If I am the guest, just send the bid and wait for host to broadcast.
+                    if (this.net.isHost) {
+                        this._applyBid(s, bid);
+                    } else {
+                        // Guest: show waiting state, disable buttons until host processes
+                        this._hideBidButtons();
+                        if (this.elBidStatus) {
+                            this.elBidStatus.textContent = 'Bid sent, waiting for host...';
+                        }
+                    }
+                } else {
+                    this._applyBid(s, bid);
                 }
-                this._applyBid(s, bid);
             });
             this.elBidButtons.appendChild(btn);
         });
@@ -4133,11 +4313,36 @@ class TekkaUI {
         };
 
         this.net.onBidPlaced = (data) => {
-            this._applyBid(Number(data.seat), data.bid);
+            // Only the HOST processes incoming bids from the guest.
+            // The host then broadcasts bid_processed back to all.
+            // The guest does NOT apply bids locally from MQTT — it waits for state_sync.
+            if (this.net.isHost) {
+                this._applyBid(Number(data.seat), data.bid);
+            }
+            // Guest: ignore onBidPlaced — handled via onStateSync below
         };
 
         this.net.onCardPlayed = (data) => {
-            this._applyCardPlay(Number(data.seat), data.card);
+            // HOST: receives a card-play from a guest, applies it locally (and re-broadcasts).
+            // GUEST: receives card-play events from host for ALL seats (including bots).
+            if (this.net.isHost) {
+                this._applyCardPlay(Number(data.seat), data.card);
+                // After applying, broadcast updated state so guest stays in sync
+                this._broadcastGameState();
+            } else {
+                this._applyCardPlay(Number(data.seat), data.card);
+            }
+        };
+
+        // GUEST: when host broadcasts state_sync, apply it to keep UI in sync with host
+        this.net.onStateSync = (state) => {
+            if (this.net.isHost) return; // Host never applies its own state sync
+            if (!state) return;
+            try {
+                this._applyStateSyncFromHost(state);
+            } catch (e) {
+                console.warn('[Tekka] onStateSync error:', e);
+            }
         };
 
         this.net.onCardAnnounce = (data) => {
