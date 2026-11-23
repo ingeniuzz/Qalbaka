@@ -1680,6 +1680,7 @@ html, body {
 
 
 
+
     <!-- Lucide icons or SVG equivalents -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2246,7 +2247,8 @@ html, body {
                 <div id="view-join-room" class="online-view hidden">
                     <div class="form-group" style="margin-bottom: 1rem;">
                         <label for="join-player-name" style="font-weight: 700; color: #334155; margin-bottom: 0.35rem; display: block;">Your Name</label>
-                        <input type="text" id="join-player-name" class="form-control" value="Player 2" maxlength="16" style="width: 100%; padding: 0.6rem; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 0.95rem;">
+                        <input type="text" id="join-player-name" class="form-control" placeholder="Enter your name\u2026" maxlength="16" style="width: 100%; padding: 0.6rem; border-radius: 8px; border: 2px solid #2563eb; font-size: 0.95rem; font-weight: 600;">
+                        <small style="color: #2563eb; font-size: 0.8rem; margin-top: 0.25rem; display: block;">Choose the name your friends will see in the game</small>
                     </div>
 
                     <div class="form-group" style="margin-bottom: 1rem;">
@@ -2378,6 +2380,7 @@ html, body {
     </script>
 
     <!-- Scripts (Ordered cleanly so no CORS or bundling is required!) -->
+    
     
     
     
@@ -7382,18 +7385,25 @@ class TableUI {
             }
 
             if (roomParam) {
+                // Instead of auto-joining with a hardcoded name, show the Join tab
+                // pre-filled with the room code & password so the friend can enter their own name.
                 setTimeout(() => {
-                    this.showOnlineModal({ tab: 'lobby' });
-                    const statusEl = document.getElementById('lobby-status-banner');
-                    if (statusEl) statusEl.textContent = `Connecting to room ${roomParam}...`;
+                    // Pre-fill the Join Room form
+                    const joinNameInput = document.getElementById('join-player-name');
+                    const joinCodeInput = document.getElementById('join-room-code');
+                    const joinPwdInput  = document.getElementById('join-room-password');
+                    if (joinCodeInput) joinCodeInput.value = roomParam;
+                    if (joinPwdInput && pwdParam)  joinPwdInput.value  = pwdParam;
+                    // Clear any stale name so the placeholder shows
+                    if (joinNameInput) {
+                        joinNameInput.value = '';
+                        joinNameInput.placeholder = 'Enter your name…';
+                    }
 
-                    window.heartsNetwork.joinRoom({
-                        roomCode: roomParam,
-                        password: pwdParam || '',
-                        playerName: 'Friend',
-                        brokerIndex: brokerParam !== null ? parseInt(brokerParam) : 0
-                    });
-                    this.showToast(`Joining Room ${roomParam}...`, 3500);
+                    // Open the modal on the Join tab
+                    this.showOnlineModal({ tab: 'join', roomCode: roomParam, password: pwdParam || '' });
+
+                    this.showToast(`📨 You've been invited to room ${roomParam}! Enter your name and hit Connect.`, 5000);
                 }, 400);
             }
         } catch (e) {}
