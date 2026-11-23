@@ -673,9 +673,20 @@ html, body {
   text-align: center;
   font-size: 0.85rem;
   font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.12s, border-color 0.15s, box-shadow 0.15s;
+  user-select: none;
+}
+.lobby-seat:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.2);
 }
 .lobby-seat.filled { background: rgba(37,99,235,0.2); border: 1.5px solid rgba(37,99,235,0.5); color: #93c5fd; }
-.lobby-seat.empty  { background: rgba(255,255,255,0.05); border: 1.5px dashed rgba(255,255,255,0.15); color: var(--text-muted); }
+.lobby-seat.empty  { background: rgba(255,255,255,0.05); border: 1.5px dashed rgba(255,255,255,0.25); color: var(--text-muted); }
+.lobby-seat.empty:hover { border-color: var(--gold); color: var(--gold-light); }
+.lobby-seat.my-seat {
+  box-shadow: 0 0 0 2px var(--gold-light), 0 0 12px rgba(212,160,23,0.5) !important;
+}
 
 .lobby-team-label {
   font-size: 0.72rem;
@@ -2362,8 +2373,31 @@ class TekkaGame {
         this.currentTrick = [];
         this.trickNumber++;
 
-        // Complete all 13 tricks in every hand (like Hearts) so all cards are played naturally
-        if (this.trickNumber > TOTAL_TRICKS) {
+        // --- Early round termination when outcome is mathematically decided ---
+        const declTricks = this.teamTricks[this.declarantTeam];
+        const defTeam = 1 - this.declarantTeam;
+        const defTricks = this.teamTricks[defTeam];
+
+        let attackersMade = false;
+        let defenderBlocked = false;
+
+        if (this.contractType === BID.BAWAND) {
+            // Solo player must take all 13 tricks. If anyone else took a trick, failed!
+            const soloTricks = this.tricksWon[this.highBidder] || 0;
+            attackersMade = soloTricks === TOTAL_TRICKS;
+            const otherTricks = (this.trickNumber - 1) - soloTricks;
+            defenderBlocked = otherTricks > 0;
+        } else if (this.contractType === BID.LARIES || this.contractType === 'double13') {
+            // Team takes all 13. If defenders take any trick, failed!
+            attackersMade = declTricks === TOTAL_TRICKS;
+            defenderBlocked = defTricks > 0;
+        } else {
+            const contractNum = Number(this.contractAmount);
+            attackersMade = declTricks >= contractNum;
+            defenderBlocked = defTricks > (TOTAL_TRICKS - contractNum);
+        }
+
+        if (attackersMade || defenderBlocked || this.trickNumber > TOTAL_TRICKS) {
             return this._endRound(result);
         }
 
@@ -2810,6 +2844,16 @@ class TekkaNetwork {
         });
     }
 
+    sendClaimSeat(seatIndex) {
+        this._publish('lobby', {
+            type: 'claim_seat',
+            seat: Number(seatIndex),
+            name: this.playerName,
+            senderId: this.senderId,
+            ts: Date.now()
+        });
+    }
+
     sendSeatAssign(assignments) {
         // assignments: { seatIndex: { name } }
         this._publish('lobby', {
@@ -2866,6 +2910,16 @@ class TekkaNetwork {
             case 'leave':
                 if (this.players[msg.seat]) this.players[msg.seat].connected = false;
                 if (this.onPlayerLeft) this.onPlayerLeft({ seat: Number(msg.seat), name: msg.name });
+                break;
+
+            case 'claim_seat':
+                if (this.onSeatClaimRequested) {
+                    this.onSeatClaimRequested({
+                        seat: Number(msg.seat),
+                        name: msg.name,
+                        senderId: msg.senderId
+                    });
+                }
                 break;
 
             case 'seat_assign':
@@ -3718,30 +3772,53 @@ class TekkaUI {
     _updateRaiseBidButton() {
         if (!this.elBtnRaise) return;
         const mySeat = this._getMySeat();
+        const defTeam = 1 - (this.game.declarantTeam !== null ? this.game.declarantTeam : 0);
+        const defTricks = (this.game.teamTricks && this.game.teamTricks[defTeam] !== undefined)
+            ? this.game.teamTricks[defTeam] : 0;
+        const maxPossible = 13 - defTricks;
+        const curBidNum = Number(this.game.highBid);
+
         const canRaise = (
             this.game.phase === PHASE.PLAYING &&
             this.game.highBidder === mySeat &&
-            this.game.highBid !== BID.BAWAND
+            !isNaN(curBidNum) &&
+            curBidNum < maxPossible &&
+            this.game.contractType !== BID.BAWAND &&
+            this.game.contractType !== BID.LARIES
         );
         this.elBtnRaise.classList.toggle('hidden', !canRaise);
     }
 
     _openRaiseBidModal() {
-        const curBid = this.game.highBid;
+        const curBidNum = Number(this.game.highBid);
+        const defTeam = 1 - (this.game.declarantTeam !== null ? this.game.declarantTeam : 0);
+        const defTricks = (this.game.teamTricks && this.game.teamTricks[defTeam] !== undefined)
+            ? this.game.teamTricks[defTeam] : 0;
+        const maxPossible = 13 - defTricks;
+
         const elCurrent = document.getElementById('raise-current-bid');
-        if (elCurrent) elCurrent.textContent = this._formatBid(curBid);
+        if (elCurrent) elCurrent.textContent = curBidNum;
 
         const container = document.getElementById('raise-bid-buttons');
         if (!container) return;
         container.innerHTML = '';
 
-        const higherBids = TekkaRules.legalBids(curBid).filter(b => b !== BID.PASS);
-        higherBids.forEach(bid => {
+        // Only numeric bids between curBidNum + 1 and maxPossible (13 - defTricks)
+        // No Laries or Bawand allowed for mid-game raises!
+        const raiseOptions = [];
+        for (let b = curBidNum + 1; b <= maxPossible; b++) {
+            raiseOptions.push(b);
+        }
+
+        if (raiseOptions.length === 0) {
+            this.showToast('No higher contract possible based on remaining tricks!', 2500);
+            return;
+        }
+
+        raiseOptions.forEach(bid => {
             const btn = document.createElement('button');
             btn.className = 'bid-btn';
-            if (bid === BID.BAWAND) btn.className += ' bid-bawand';
-            else if (bid === BID.LARIES || bid === 'double13') btn.className += ' bid-double13';
-            btn.textContent = this._formatBid(bid);
+            btn.textContent = `${bid} tricks`;
             btn.style.margin = '4px';
             btn.addEventListener('click', () => {
                 this._closeModal('modal-raise-bid');
@@ -4212,6 +4289,13 @@ class TekkaUI {
         // Start game (host only)
         document.getElementById('btn-start-online')?.addEventListener('click', () => this._startOnlineGame());
 
+        // Lobby seat selection
+        for (let i = 0; i < 4; i++) {
+            document.getElementById(`lobby-seat-${i}`)?.addEventListener('click', () => {
+                this._onLobbySeatClicked(i);
+            });
+        }
+
         // Leave lobby
         document.getElementById('btn-leave-lobby')?.addEventListener('click', () => {
             this.net.disconnect();
@@ -4288,20 +4372,56 @@ class TekkaUI {
 
         this.net.onPlayerJoined = (data) => {
             if (this.net.isHost && this.lobbySeats.length > 0) {
-                // Find next bot/empty seat to assign to new human player
-                const availableSeat = this.lobbySeats.find(s => s.seatIndex !== 0 && s.isBot);
-                if (availableSeat) {
-                    availableSeat.name = data.name || 'Friend';
-                    availableSeat.isBot = false;
+                // Check if already in a seat
+                const existing = this.lobbySeats.find(s => s.name === data.name && !s.isBot);
+                if (!existing) {
+                    // Place new player in first open bot seat
+                    const availableSeat = this.lobbySeats.find(s => s.seatIndex !== 0 && s.isBot);
+                    if (availableSeat) {
+                        availableSeat.name = data.name || 'Friend';
+                        availableSeat.isBot = false;
+                    }
                 }
                 this.net.sendLobbyState(this.lobbySeats);
                 this._updateLobbySeatsFromList(this.lobbySeats);
             }
-            this.showToast(`${data.name || 'Player'} joined room!`, 2500);
+            this.showToast(`${data.name || 'Player'} joined room! Tap a seat to choose your spot.`, 3000);
+        };
+
+        this.net.onSeatClaimRequested = (data) => {
+            if (!this.net.isHost || !this.lobbySeats) return;
+            const targetSeat = Number(data.seat);
+            if (targetSeat < 0 || targetSeat > 3) return;
+            const target = this.lobbySeats[targetSeat];
+            if (target && target.isBot) {
+                const defaultNames = ['South Bot', 'West Bot', 'North Bot', 'East Bot'];
+                // Free previous seat of this player
+                const oldSeat = this.lobbySeats.find(s => s.name === data.name && !s.isBot);
+                if (oldSeat) {
+                    oldSeat.name = defaultNames[oldSeat.seatIndex];
+                    oldSeat.isBot = true;
+                }
+                // Assign target seat
+                target.name = data.name;
+                target.isBot = false;
+
+                this.net.sendLobbyState(this.lobbySeats);
+                this._updateLobbySeatsFromList(this.lobbySeats);
+                this.showToast(`${data.name} chose ${this._getSeatName(targetSeat)}!`, 2500);
+            } else {
+                this.showToast(`Seat ${this._getSeatName(targetSeat)} is already taken!`, 2000);
+            }
         };
 
         this.net.onLobbyUpdated = (seats) => {
             this.lobbySeats = seats;
+            if (!this.net.isHost) {
+                const myName = (this.net.playerName || '').trim().toLowerCase();
+                const mySeat = seats.find(s => s && s.name && s.name.trim().toLowerCase() === myName && !s.isBot);
+                if (mySeat) {
+                    this.net.mySeatIndex = Number(mySeat.seatIndex);
+                }
+            }
             this._updateLobbySeatsFromList(seats);
         };
 
@@ -4420,16 +4540,83 @@ class TekkaUI {
         };
     }
 
+    _onLobbySeatClicked(seatIndex) {
+        seatIndex = Number(seatIndex);
+        if (!this.lobbySeats || !this.lobbySeats[seatIndex]) return;
+
+        const target = this.lobbySeats[seatIndex];
+        const defaultNames = ['South Bot', 'West Bot', 'North Bot', 'East Bot'];
+
+        if (this.net.isHost) {
+            // Host is clicking a seat
+            if (!target.isBot && target.seatIndex !== this.net.mySeatIndex) {
+                return this.showToast(`Seat is already taken by ${target.name}!`, 2000);
+            }
+            const currentSeat = (this.net.mySeatIndex !== null && this.net.mySeatIndex !== undefined) ? Number(this.net.mySeatIndex) : 0;
+            if (currentSeat === seatIndex) {
+                return this.showToast(`You are already in this seat!`, 2000);
+            }
+            // Free current seat
+            this.lobbySeats[currentSeat].name = defaultNames[currentSeat];
+            this.lobbySeats[currentSeat].isBot = true;
+            this.lobbySeats[currentSeat].isHost = false;
+
+            // Take new seat
+            target.name = this.net.playerName || 'Host';
+            target.isBot = false;
+            target.isHost = true;
+            this.net.mySeatIndex = seatIndex;
+
+            this.net.sendLobbyState(this.lobbySeats);
+            this._updateLobbySeatsFromList(this.lobbySeats);
+            this.showToast(`You moved to ${this._getSeatName(seatIndex)}!`, 2000);
+        } else {
+            // Guest is clicking a seat
+            if (!target.isBot) {
+                if (target.seatIndex === this.net.mySeatIndex) {
+                    return this.showToast(`You are already in this seat!`, 2000);
+                }
+                return this.showToast(`Seat is already taken by ${target.name}!`, 2000);
+            }
+            this.net.sendClaimSeat(seatIndex);
+            this.showToast(`Requesting ${this._getSeatName(seatIndex)}...`, 2000);
+        }
+    }
+
+    _getSeatName(idx) {
+        switch (Number(idx)) {
+            case 0: return 'South (Team N/S)';
+            case 1: return 'West (Team W/E)';
+            case 2: return 'North (Team N/S Partner)';
+            case 3: return 'East (Team W/E)';
+            default: return `Seat ${idx}`;
+        }
+    }
+
     _updateLobbySeatsFromList(seats) {
         if (!seats || seats.length === 0) return;
+        const mySeat = (this.net && this.net.mySeatIndex !== null && this.net.mySeatIndex !== undefined)
+            ? Number(this.net.mySeatIndex) : null;
+
         for (let i = 0; i < 4; i++) {
             const el = document.getElementById(`lobby-seat-${i}`);
             if (!el) continue;
             const s = seats[i];
             if (s) {
-                const label = s.isBot ? `🤖 ${s.name}` : `👤 ${s.name}`;
+                const isMe = (mySeat === i);
+                const isBot = s.isBot;
+                let label = '';
+                if (isBot) {
+                    label = `🤖 ${s.name} (Tap to sit here)`;
+                    el.className = 'lobby-seat empty';
+                } else {
+                    const hostTag = s.isHost ? ' [Host]' : '';
+                    const meTag = isMe ? ' (You)' : '';
+                    label = `👤 ${s.name}${hostTag}${meTag}`;
+                    el.className = 'lobby-seat filled' + (isMe ? ' my-seat' : '');
+                }
                 el.textContent = label;
-                el.className = s.isBot ? 'lobby-seat empty' : 'lobby-seat filled';
+                el.style.cursor = 'pointer';
             }
         }
     }
