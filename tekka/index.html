@@ -328,8 +328,8 @@ html, body {
 
 .trick-slot {
   position: absolute;
-  width: 50px;
-  height: 72px;
+  width: 70px;
+  height: 100px;
   transition: transform 0.15s;
 }
 .trick-slot.pos-south { bottom: 0; left: 50%; transform: translateX(-50%); }
@@ -339,21 +339,19 @@ html, body {
 
 .card-enter { opacity: 0; transform: scale(0.8) !important; }
 
-/* --- Card face --- */
+/* --- Card face (SVG-based, matches Hearts) --- */
 .card-face {
   width: 100%;
   height: 100%;
-  background: var(--card-bg);
-  border-radius: 6px;
-  box-shadow: 0 3px 8px var(--card-shadow);
-  display: grid;
-  grid-template-rows: auto 1fr auto;
-  padding: 2px 3px;
-  font-family: 'Georgia', serif;
-  position: relative;
+  display: block;
 }
-.card-face.red { color: #c41e3a; }
-.card-face.black { color: #1a1a2e; }
+.playing-card-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.5);
+}
 
 .card-corner {
   display: flex;
@@ -1233,6 +1231,126 @@ function deserializeCard(data) {
 
 function deserializeHand(handData) {
     return handData.map(deserializeCard);
+}
+
+/* === SVG Card Renderer (ported from Hearts) === */
+class TekkaCardRenderer {
+
+    static getSuitSvgPath(suit, x = 0, y = 0, scale = 1) {
+        const redColor   = '#dc2626';
+        const blackColor = '#1e1b4b';
+        const color = (suit === 'hearts' || suit === 'diamonds') ? redColor : blackColor;
+        const transforms = `transform="translate(${x}, ${y}) scale(${scale})"`;
+        switch (suit) {
+            case 'hearts':
+                return `<g ${transforms} fill="${color}"><path d="M12,21.35 C11.5,21.35 3.8,14.6 2,9.2 C0.5,5.2 3.6,1.4 8,1.9 C10.2,2.1 11.4,3.5 12,4.6 C12.6,3.5 13.8,2.1 16,1.9 C20.4,1.4 23.5,5.2 22,9.2 C20.2,14.6 12.5,21.35 12,21.35 Z" /></g>`;
+            case 'diamonds':
+                return `<g ${transforms} fill="${color}"><polygon points="12,0.8 22.5,12 12,23.2 1.5,12" /></g>`;
+            case 'spades':
+                return `<g ${transforms} fill="${color}"><path d="M12,1.2 C12,1.2 2.5,10.5 2.5,15.2 C2.5,18.5 5.2,20.2 8.5,20.1 C10,20 11.2,19.2 12,18.2 C12.8,19.2 14,20 15.5,20.1 C18.8,20.2 21.5,18.5 21.5,15.2 C21.5,10.5 12,1.2 12,1.2 Z" /><path d="M10.2,17.5 L13.8,17.5 L15.5,23.2 L8.5,23.2 Z" /></g>`;
+            case 'clubs':
+                return `<g ${transforms} fill="${color}"><circle cx="12" cy="6.8" r="5" /><circle cx="6.8" cy="14" r="5" /><circle cx="17.2" cy="14" r="5" /><circle cx="12" cy="12" r="3.2" /><path d="M10.5,13 L13.5,13 L15.5,23.2 L8.5,23.2 Z" /></g>`;
+            default:
+                return '';
+        }
+    }
+
+    static renderPipLayout(card) {
+        const rankVal = RANK_VALUES[card.rank];
+        let pips = '';
+        const scale = rankVal > 8 ? 0.72 : 0.8;
+        const layouts = {
+            2:  [[33,24],[33,80]],
+            3:  [[33,24],[33,52],[33,80]],
+            4:  [[22,24],[44,24],[22,80],[44,80]],
+            5:  [[22,24],[44,24],[33,52],[22,80],[44,80]],
+            6:  [[22,24],[44,24],[22,52],[44,52],[22,80],[44,80]],
+            7:  [[22,24],[44,24],[33,38],[22,52],[44,52],[22,80],[44,80]],
+            8:  [[22,24],[44,24],[33,36],[22,52],[44,52],[33,68],[22,80],[44,80]],
+            9:  [[22,22],[44,22],[22,42],[44,42],[33,52],[22,62],[44,62],[22,82],[44,82]],
+            10: [[22,20],[44,20],[33,32],[22,44],[44,44],[22,60],[44,60],[33,72],[22,84],[44,84]]
+        };
+        const coords = layouts[rankVal] || [[33,52]];
+        coords.forEach(([px, py]) => {
+            pips += `<g transform="translate(${px}, ${py}) scale(${scale})">${this.getSuitSvgPath(card.suit, 0, 0, 1)}</g>`;
+        });
+        return pips;
+    }
+
+    static renderCardFace(card) {
+        const color = card.isRed ? '#dc2626' : '#1e1b4b';
+        const rankVal = RANK_VALUES[card.rank];
+        const isFace = rankVal >= 11 && rankVal <= 13;
+        const isAce  = rankVal === 14;
+
+        // Badge bg per suit
+        const badgeBg = card.suit === 'hearts'   ? '#fee2e2'
+                      : card.suit === 'diamonds'  ? '#dbeafe'
+                      : card.suit === 'clubs'     ? '#d1fae5'
+                      : '#f1f5f9';
+
+        let centerContent = '';
+        if (isFace) {
+            const royalTitle = rankVal === 11 ? 'JACK' : (rankVal === 12 ? 'QUEEN' : 'KING');
+            centerContent = `
+                <g transform="translate(18, 27)">
+                    <rect width="54" height="74" rx="8" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.8" />
+                    <circle cx="27" cy="30" r="19" fill="${badgeBg}" />
+                    <text x="27" y="38" font-family="system-ui,-apple-system,sans-serif" font-weight="900" font-size="25" text-anchor="middle" fill="${color}">${card.rank}</text>
+                    <text x="27" y="58" font-family="system-ui,sans-serif" font-weight="800" font-size="7.5" letter-spacing="1" text-anchor="middle" fill="#475569">${royalTitle}</text>
+                    <g transform="translate(15, 65) scale(1.0)">${this.getSuitSvgPath(card.suit, 0, 0, 1)}</g>
+                </g>`;
+        } else if (isAce) {
+            centerContent = `<g transform="translate(24, 42) scale(1.75)">${this.getSuitSvgPath(card.suit, 0, 0, 1)}</g>`;
+        } else {
+            centerContent = this.renderPipLayout(card);
+        }
+
+        return `
+            <svg class="playing-card-svg" viewBox="0 0 90 128" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <linearGradient id="cg-${card.id}" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#ffffff" />
+                        <stop offset="100%" stop-color="#f8fafc" />
+                    </linearGradient>
+                </defs>
+                <rect x="1" y="1" width="88" height="126" rx="8" fill="url(#cg-${card.id})" stroke="#cbd5e1" stroke-width="1.2" />
+
+                <!-- Top-left index -->
+                <g transform="translate(6, 9)">
+                    <text x="5" y="16" font-family="system-ui,-apple-system,sans-serif" font-weight="900" font-size="19" fill="${color}" text-anchor="middle">${card.rank}</text>
+                    <g transform="translate(-7, 20) scale(1.0)">${this.getSuitSvgPath(card.suit, 0, 0, 1)}</g>
+                </g>
+
+                <!-- Bottom-right index (rotated) -->
+                <g transform="translate(84, 119) rotate(180)">
+                    <text x="5" y="16" font-family="system-ui,-apple-system,sans-serif" font-weight="900" font-size="19" fill="${color}" text-anchor="middle">${card.rank}</text>
+                    <g transform="translate(-7, 20) scale(1.0)">${this.getSuitSvgPath(card.suit, 0, 0, 1)}</g>
+                </g>
+
+                <!-- Center -->
+                ${centerContent}
+            </svg>`;
+    }
+
+    static renderCardBack() {
+        return `
+            <svg class="playing-card-svg" viewBox="0 0 90 128" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <pattern id="tekka-lattice" width="12" height="12" patternUnits="userSpaceOnUse">
+                        <path d="M 0 6 L 6 0 L 12 6 L 6 12 Z" fill="none" stroke="#2563eb" stroke-width="1.2" />
+                        <circle cx="6" cy="6" r="1.5" fill="#93c5fd" />
+                    </pattern>
+                </defs>
+                <rect x="1" y="1" width="88" height="126" rx="8" fill="#ffffff" stroke="#94a3b8" stroke-width="1" />
+                <rect x="5" y="5" width="80" height="118" rx="6" fill="#1e3a8a" stroke="#172554" stroke-width="1.5" />
+                <rect x="8" y="8" width="74" height="112" rx="4" fill="url(#tekka-lattice)" />
+                <rect x="22" y="38" width="46" height="52" rx="23" fill="#1e3a8a" stroke="#93c5fd" stroke-width="1.5" />
+                <g transform="translate(37, 56) scale(1)">
+                    <path fill="#93c5fd" d="M0,4 A4,4 0 0,1 8,4 A4,4 0 0,1 16,4 Q16,9 8,15 Q0,9 0,4 Z" />
+                </g>
+            </svg>`;
+    }
 }
 
 /* === rules.js === */
@@ -2871,12 +2989,7 @@ class TekkaUI {
     }
 
     _cardFaceHTML(card) {
-        const color = card.isRed ? 'red' : 'black';
-        return `<div class="card-face ${color}">
-            <div class="card-corner top-left"><span class="rank">${card.displayRank}</span><span class="suit">${card.symbol}</span></div>
-            <div class="card-center">${card.symbol}</div>
-            <div class="card-corner bottom-right"><span class="rank">${card.displayRank}</span><span class="suit">${card.symbol}</span></div>
-        </div>`;
+        return TekkaCardRenderer.renderCardFace(card);
     }
 
     _animateCardToTrick(seatIndex, card) {
