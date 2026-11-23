@@ -39,6 +39,7 @@ html, body {
     color: #f8fafc;
     overflow: hidden;
     height: 100%;
+    height: 100dvh;
     width: 100%;
 }
 
@@ -46,20 +47,49 @@ html, body {
 #app {
     display: flex;
     flex-direction: column;
-    height: 100vh;
+    height: 100%;
+    height: 100dvh;
     width: 100vw;
+    overflow: hidden;
 }
 
 /* Header bar */
 .game-header {
-    height: 52px;
-    background: rgba(15, 23, 42, 0.85);
-    backdrop-filter: blur(8px);
+    height: 50px;
+    background: rgba(15, 23, 42, 0.9);
+    backdrop-filter: blur(10px);
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0 1.25rem;
+    padding: 0 1rem;
+    z-index: 50;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.btn-menu-trigger {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #f8fafc;
+    padding: 0.38rem 0.65rem;
+    border-radius: 8px;
+    font-size: 1.15rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.btn-menu-trigger:hover {
+    background: rgba(255, 255, 255, 0.18);
+    transform: scale(1.03);
+}
     z-index: 50;
 }
 
@@ -680,6 +710,86 @@ html, body {
     border-radius: 0 0 16px 16px;
 }
 
+/* MobilityWare Style Game Menu Modal */
+.menu-dialog {
+    max-width: 440px;
+    width: 92vw;
+}
+
+.game-menu-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.65rem;
+    margin-bottom: 0.25rem;
+}
+
+.game-menu-card {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 0.85rem;
+    background: #ffffff;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 12px;
+    cursor: pointer;
+    text-align: left;
+    color: #0f172a;
+    transition: all 0.15s ease;
+    font-family: inherit;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.game-menu-card:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.game-menu-card .menu-icon {
+    font-size: 1.35rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: #f1f5f9;
+    flex-shrink: 0;
+}
+
+.game-menu-card .menu-info {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.game-menu-card .menu-info strong {
+    font-size: 0.86rem;
+    font-weight: 700;
+    color: #1e293b;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.game-menu-card .menu-info small {
+    font-size: 0.7rem;
+    color: #64748b;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.game-menu-card.highlight-online {
+    background: linear-gradient(135deg, #eff6ff, #dbeafe);
+    border-color: #93c5fd;
+}
+
+.game-menu-card.highlight-online .menu-icon {
+    background: #bfdbfe;
+}
+
 /* Scoreboard Ledger Table */
 .scoreboard-table {
     width: 100%;
@@ -1075,35 +1185,53 @@ html, body {
    ========================================================================== */
 
 @media (max-width: 768px) {
+    .btn-desktop-only {
+        display: none !important;
+    }
     .btn-label {
         display: none !important;
+    }
+    .game-menu-grid {
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+    }
+    .game-menu-card {
+        padding: 0.65rem 0.8rem;
     }
 }
 
 @media (max-width: 640px) {
-    /* Header Bar */
+    /* Header Bar (Clean MobilityWare Style) */
     .game-header {
-        height: 44px;
-        padding: 0 0.4rem;
+        height: 46px;
+        padding: 0 0.6rem;
         gap: 0.25rem;
+    }
+    .btn-menu-trigger {
+        padding: 0.3rem 0.55rem;
+        font-size: 1.1rem;
+        border-radius: 6px;
     }
     .brand-title {
-        font-size: 0.95rem;
-        gap: 0.25rem;
+        font-size: 1rem;
+        gap: 0.3rem;
     }
     .brand-heart {
-        font-size: 1.15rem;
+        font-size: 1.2rem;
     }
     .header-actions {
-        gap: 0.2rem;
+        gap: 0.25rem;
     }
     .icon-btn {
-        padding: 0.32rem 0.45rem;
-        font-size: 0.8rem;
+        padding: 0.32rem 0.55rem;
+        font-size: 0.82rem;
         border-radius: 6px;
         gap: 0.2rem;
     }
     .btn-label {
+        display: none !important;
+    }
+    .btn-desktop-only {
         display: none !important;
     }
 
@@ -1444,6 +1572,8 @@ html, body {
 
 
 
+
+
     <!-- Lucide icons or SVG equivalents -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1453,38 +1583,42 @@ html, body {
     <div id="app">
         <!-- Header Nav -->
         <header class="game-header">
+            <div class="header-left">
+                <button id="btn-main-menu" class="btn-menu-trigger" aria-label="Game Menu" title="Game Menu">
+                    <span>☰</span>
+                </button>
+            </div>
             <div class="brand-title">
-                <span class="brand-heart">â™¥</span>
+                <span class="brand-heart">♥</span>
                 <span>Hearts</span>
             </div>
-
             <div class="header-actions">
-                <button id="btn-undo" class="icon-btn" title="Undo Last Trick" disabled>
+                <button id="btn-undo" class="icon-btn btn-desktop-only" title="Undo Last Trick" disabled>
                     <span>↺</span><span class="btn-label"> Undo</span>
                 </button>
-                <button id="btn-hint" class="icon-btn" title="Tactical Hint">
-                    <span>💡</span><span class="btn-label"> Hint</span>
-                </button>
-                <button id="btn-scoreboard" class="icon-btn" title="Scoreboard Ledger">
+                <button id="btn-scoreboard" class="icon-btn btn-desktop-only" title="Scoreboard Ledger">
                     <span>📊</span><span class="btn-label"> Scores</span>
                 </button>
-                <button id="btn-stats" class="icon-btn" title="Career Statistics">
+                <button id="btn-stats" class="icon-btn btn-desktop-only" title="Career Statistics">
                     <span>🏆</span><span class="btn-label"> Stats</span>
                 </button>
-                <button id="btn-rules" class="icon-btn" title="Game Rules">
+                <button id="btn-rules" class="icon-btn btn-desktop-only" title="Game Rules">
                     <span>📖</span><span class="btn-label"> Rules</span>
                 </button>
-                <button id="btn-settings" class="icon-btn" title="Settings">
+                <button id="btn-settings" class="icon-btn btn-desktop-only" title="Settings">
                     <span>⚙</span>
                 </button>
-                <button id="btn-toggle-sound" class="icon-btn" title="Sound Toggle">
+                <button id="btn-toggle-sound" class="icon-btn btn-desktop-only" title="Sound Toggle">
                     <span id="sound-icon">🔊</span>
                 </button>
-                <button id="btn-online" class="icon-btn btn-online-highlight" title="Play Online with Friends">
+                <button id="btn-online" class="icon-btn btn-desktop-only btn-online-highlight" title="Play Online with Friends">
                     <span>🌐</span><span class="btn-label"> Online</span>
                 </button>
-                <button id="btn-new-game" class="icon-btn btn-primary-action" title="New Game">
+                <button id="btn-new-game" class="icon-btn btn-desktop-only btn-primary-action" title="New Game">
                     <span>+</span><span class="btn-label"> New Game</span>
+                </button>
+                <button id="btn-hint" class="icon-btn btn-hint-highlight" title="Tactical Hint">
+                    <span>💡</span><span class="btn-label"> Hint</span>
                 </button>
             </div>
         </header>
@@ -1613,7 +1747,81 @@ html, body {
          ========================================================================== -->
 
     <!-- Scoreboard Ledger Modal -->
-    <div id="modal-scoreboard" class="modal-backdrop hidden">
+        <!-- MobilityWare Style Game Menu Modal -->
+    <div id="modal-game-menu" class="modal-backdrop hidden">
+        <div class="modal-dialog menu-dialog">
+            <div class="modal-header">
+                <h2 class="modal-title"><span>♥</span> Game Menu</h2>
+                <button class="btn-close" data-close-modal="modal-game-menu">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="game-menu-grid">
+                    <button id="menu-item-scoreboard" class="game-menu-card">
+                        <span class="menu-icon">📊</span>
+                        <div class="menu-info">
+                            <strong>Scoreboard</strong>
+                            <small>Round history & ledger</small>
+                        </div>
+                    </button>
+                    <button id="menu-item-stats" class="game-menu-card">
+                        <span class="menu-icon">🏆</span>
+                        <div class="menu-info">
+                            <strong>Career Statistics</strong>
+                            <small>Wins, streaks & moons shot</small>
+                        </div>
+                    </button>
+                    <button id="menu-item-rules" class="game-menu-card">
+                        <span class="menu-icon">📖</span>
+                        <div class="menu-info">
+                            <strong>How to Play / Rules</strong>
+                            <small>Card values & game rules</small>
+                        </div>
+                    </button>
+                    <button id="menu-item-settings" class="game-menu-card">
+                        <span class="menu-icon">⚙</span>
+                        <div class="menu-info">
+                            <strong>Table & Settings</strong>
+                            <small>Felt themes & options</small>
+                        </div>
+                    </button>
+                    <button id="menu-item-sound" class="game-menu-card">
+                        <span class="menu-icon" id="menu-sound-icon">🔊</span>
+                        <div class="menu-info">
+                            <strong id="menu-sound-text">Sound: ON</strong>
+                            <small>Toggle audio effects</small>
+                        </div>
+                    </button>
+                    <button id="menu-item-online" class="game-menu-card highlight-online">
+                        <span class="menu-icon">🌐</span>
+                        <div class="menu-info">
+                            <strong>Online Multiplayer</strong>
+                            <small>Play with friends in room</small>
+                        </div>
+                    </button>
+                    <button id="menu-item-undo" class="game-menu-card">
+                        <span class="menu-icon">↺</span>
+                        <div class="menu-info">
+                            <strong>Undo Last Trick</strong>
+                            <small>Solo play takeback</small>
+                        </div>
+                    </button>
+                    <button id="menu-item-new-game" class="game-menu-card">
+                        <span class="menu-icon">➕</span>
+                        <div class="menu-info">
+                            <strong>New Game</strong>
+                            <small>Deal a fresh match</small>
+                        </div>
+                    </button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="btn-resume-game" class="btn-primary-action" style="width: 100%; justify-content: center; padding: 0.75rem; font-size: 1rem; border-radius: 8px;">
+                    Resume Game ▶
+                </button>
+            </div>
+        </div>
+    </div>
+<div id="modal-scoreboard" class="modal-backdrop hidden">
         <div class="modal-dialog">
             <div class="modal-header">
                 <h2 class="modal-title">Match Scoreboard</h2>
@@ -2068,6 +2276,8 @@ html, body {
     </script>
 
     <!-- Scripts (Ordered cleanly so no CORS or bundling is required!) -->
+    
+    
     
     
     
@@ -4993,6 +5203,7 @@ class TableUI {
         this.hintBoxEl = document.getElementById('hint-tooltip');
 
         // Header controls
+        this.btnMainMenu = document.getElementById('btn-main-menu');
         this.btnUndo = document.getElementById('btn-undo');
         this.btnHint = document.getElementById('btn-hint');
         this.btnScoreboard = document.getElementById('btn-scoreboard');
@@ -5011,6 +5222,7 @@ class TableUI {
         this.btnSendChat = document.getElementById('btn-send-chat');
 
         // Modals
+        this.modalGameMenu = document.getElementById('modal-game-menu');
         this.modalScoreboard = document.getElementById('modal-scoreboard');
         this.modalSettings = document.getElementById('modal-settings');
         this.modalStats = document.getElementById('modal-stats');
@@ -5056,6 +5268,55 @@ class TableUI {
                 }
             });
         }
+
+        // Main Menu trigger (MobilityWare style)
+        if (this.btnMainMenu) {
+            this.btnMainMenu.addEventListener('click', () => {
+                this.showGameMenuModal();
+            });
+        }
+
+        // Main Menu action buttons
+        document.getElementById('menu-item-scoreboard')?.addEventListener('click', () => {
+            this.hideGameMenuModal();
+            this.showScoreboardModal();
+        });
+        document.getElementById('menu-item-stats')?.addEventListener('click', () => {
+            this.hideGameMenuModal();
+            this.showStatsModal();
+        });
+        document.getElementById('menu-item-rules')?.addEventListener('click', () => {
+            this.hideGameMenuModal();
+            this.showRulesModal();
+        });
+        document.getElementById('menu-item-settings')?.addEventListener('click', () => {
+            this.hideGameMenuModal();
+            this.showSettingsModal();
+        });
+        document.getElementById('menu-item-sound')?.addEventListener('click', () => {
+            const settings = StatsManager.loadSettings();
+            settings.soundEnabled = !settings.soundEnabled;
+            StatsManager.saveSettings(settings);
+            window.soundEngine.setMuted(!settings.soundEnabled);
+            this.updateSoundButtonUI(settings.soundEnabled);
+        });
+        document.getElementById('menu-item-online')?.addEventListener('click', () => {
+            this.hideGameMenuModal();
+            this.showOnlineModal();
+        });
+        document.getElementById('menu-item-undo')?.addEventListener('click', () => {
+            this.hideGameMenuModal();
+            if (this.game && !this.onlineIsGuest) {
+                this.game.undoLastTrick();
+            }
+        });
+        document.getElementById('menu-item-new-game')?.addEventListener('click', () => {
+            this.hideGameMenuModal();
+            this.showNewGameModal();
+        });
+        document.getElementById('btn-resume-game')?.addEventListener('click', () => {
+            this.hideGameMenuModal();
+        });
 
         // Modal triggers
         this.btnScoreboard?.addEventListener('click', () => this.showScoreboardModal());
@@ -5140,9 +5401,35 @@ class TableUI {
     }
 
     updateSoundButtonUI(enabled) {
-        if (!this.btnToggleSound) return;
-        this.btnToggleSound.innerHTML = enabled ? '🔊' : '🔇';
-        this.btnToggleSound.title = enabled ? 'Sound On' : 'Sound Off';
+        if (this.btnToggleSound) {
+            this.btnToggleSound.innerHTML = enabled ? '🔊' : '🔇';
+            this.btnToggleSound.title = enabled ? 'Sound On' : 'Sound Off';
+        }
+        const menuSoundIcon = document.getElementById('menu-sound-icon');
+        const menuSoundText = document.getElementById('menu-sound-text');
+        if (menuSoundIcon) menuSoundIcon.textContent = enabled ? '🔊' : '🔇';
+        if (menuSoundText) menuSoundText.textContent = `Sound: ${enabled ? 'ON' : 'OFF'}`;
+    }
+
+    showGameMenuModal() {
+        if (!this.modalGameMenu) return;
+        const settings = StatsManager.loadSettings();
+        this.updateSoundButtonUI(settings.soundEnabled);
+
+        const undoItem = document.getElementById('menu-item-undo');
+        if (undoItem) {
+            const canUndo = !this.onlineIsGuest && this.game && this.game.canUndo && this.game.canUndo();
+            undoItem.style.opacity = canUndo ? '1' : '0.45';
+            undoItem.style.pointerEvents = canUndo ? 'auto' : 'none';
+        }
+
+        this.modalGameMenu.classList.remove('hidden');
+    }
+
+    hideGameMenuModal() {
+        if (this.modalGameMenu) {
+            this.modalGameMenu.classList.add('hidden');
+        }
     }
 
     // Converts visual station index (0=South, 1=West, 2=North, 3=East) to Player Index
@@ -5251,6 +5538,7 @@ class TableUI {
                                 myHand: guestHand,
                                 receivedCards: received,
                                 passStage: this.game.passStage,
+                                passDirection: 'hold',
                                 nextPhase: HeartsGame.PHASES.PLAYING
                             });
                         }
@@ -5678,7 +5966,7 @@ class TableUI {
         // Online Guest routing
         if (window.heartsNetwork && window.heartsNetwork.isConnected && !window.heartsNetwork.isHost) {
             // Passing phase for Online Guest
-            const isPassing = this.onlineIsPassingPhase || (this.onlinePassDirection && this.onlinePassDirection !== 'hold');
+            const isPassing = Boolean(this.onlineIsPassingPhase);
             if (isPassing) {
                 if (this.onlineGuestPassedCardIds && this.onlineGuestPassedCardIds.size === 3) {
                     this.showToast('You already passed your cards! Waiting for other players...');
@@ -6569,6 +6857,9 @@ class TableUI {
             if (window.soundEngine) window.soundEngine.playCardPass();
 
             if (!this.onlineIsPassingPhase) {
+                this.onlinePassDirection = null;
+                this.selectedPassCardIds.clear();
+                this.onlineGuestPassedCardIds = null;
                 if (this.passControlsEl) this.passControlsEl.classList.add('hidden');
                 this.showToast('Passing phase complete! Starting round.');
             } else {
@@ -6599,7 +6890,9 @@ class TableUI {
 
         net.onTurnUpdated = (data) => {
             this.onlineIsPassingPhase = false;
+            this.onlinePassDirection = null;
             this.onlineGuestPassedCardIds = null;
+            this.selectedPassCardIds.clear();
             if (this.passControlsEl) this.passControlsEl.classList.add('hidden');
 
             this.onlineActivePlayerIndex = data.activePlayerIndex;
@@ -6621,6 +6914,11 @@ class TableUI {
         };
 
         net.onCardPlayed = (data) => {
+            this.onlineIsPassingPhase = false;
+            this.onlinePassDirection = null;
+            this.selectedPassCardIds.clear();
+            if (this.passControlsEl) this.passControlsEl.classList.add('hidden');
+
             const playedCard = new Card(data.card.suit, data.card.rank);
             this.onlineCurrentTrick = this.onlineCurrentTrick || [];
             this.onlineCurrentTrick.push({ playerIndex: data.playerIndex, card: playedCard });
@@ -6754,7 +7052,7 @@ class TableUI {
             return a.rank - b.rank;
         });
 
-        const isPassingPhase = this.onlineIsPassingPhase;
+        const isPassingPhase = Boolean(this.onlineIsPassingPhase);
         const mySeat = window.heartsNetwork ? window.heartsNetwork.mySeatIndex : 1;
         const isMyTurn = this.onlineActivePlayerIndex === mySeat;
         const isFirstTrick = (this.onlineTrickNumber || 1) === 1;
@@ -6764,8 +7062,8 @@ class TableUI {
             cardEl.className = 'card-wrapper card-interactive';
             cardEl.dataset.cardId = card.id;
 
-            const isSelected = this.selectedPassCardIds.has(card.id);
-            const isAlreadyPassed = this.onlineGuestPassedCardIds && this.onlineGuestPassedCardIds.has(card.id);
+            const isSelected = isPassingPhase && this.selectedPassCardIds.has(card.id);
+            const isAlreadyPassed = isPassingPhase && this.onlineGuestPassedCardIds && this.onlineGuestPassedCardIds.has(card.id);
 
             if (isSelected || isAlreadyPassed) {
                 cardEl.classList.add('selected-pass');
@@ -6786,12 +7084,12 @@ class TableUI {
 
             cardEl.innerHTML = CardRenderer.renderCardFace(card);
 
-            if (isSelected) {
+            if (isPassingPhase && isSelected) {
                 const badge = document.createElement('div');
                 badge.className = 'pass-badge-indicator';
                 badge.textContent = '▲ PASS';
                 cardEl.appendChild(badge);
-            } else if (isAlreadyPassed) {
+            } else if (isPassingPhase && isAlreadyPassed) {
                 const badge = document.createElement('div');
                 badge.className = 'pass-badge-indicator';
                 badge.textContent = '✓ READY';
