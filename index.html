@@ -1443,6 +1443,7 @@ html, body {
 
 
 
+
     <!-- Lucide icons or SVG equivalents -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2067,6 +2068,7 @@ html, body {
     </script>
 
     <!-- Scripts (Ordered cleanly so no CORS or bundling is required!) -->
+    
     
     
     
@@ -4634,12 +4636,9 @@ class HeartsGame {
         // Check if Triple Pass mode has more stages remaining (stages 1 and 2 advance to next stage)
         if (this.gameMode === HeartsRules.GAME_MODES.TRIPLE_PASS && this.passStage < 3) {
             const completedStage = this.passStage;
-            if (this.onStateChange) this.onStateChange('stage_passed', { completedStage });
-
-            setTimeout(() => {
-                this.passStage += 1;
-                this.beginPassingPhase();
-            }, 1400);
+            this.passStage += 1;
+            this.beginPassingPhase();
+            if (this.onStateChange) this.onStateChange('stage_passed', { completedStage, newStage: this.passStage });
         } else {
             // Passing complete! Transition to playing
             if (this.onStateChange) this.onStateChange('passed');
@@ -5210,7 +5209,8 @@ class TableUI {
                 }
             } else if (event === 'stage_passed') {
                 const stageName = data.completedStage === 1 ? 'Left' : (data.completedStage === 2 ? 'Front' : 'Right');
-                this.showToast(`Stage ${data.completedStage}/3 (${stageName}) passed! Next pass starting.`);
+                const nextStageName = data.newStage === 2 ? 'Front (Across)' : (data.newStage === 3 ? 'Right' : 'Complete');
+                this.showToast(`Stage ${data.completedStage}/3 (${stageName}) passed! Next: Stage ${data.newStage}/3 (${nextStageName})...`, 3000);
                 this.selectedPassCardIds.clear();
                 this.hostPassedCardIds = null;
 
@@ -5227,6 +5227,7 @@ class TableUI {
                                 myHand: guestHand,
                                 receivedCards: received,
                                 passStage: this.game.passStage,
+                                passDirection: this.game.passDirection,
                                 nextPhase: HeartsGame.PHASES.PASSING
                             });
                         }
@@ -6561,6 +6562,8 @@ class TableUI {
             this.onlineReceivedCards = (data.receivedCards || []).map(c => new Card(c.suit, c.rank));
             this.selectedPassCardIds.clear();
             this.onlineGuestPassedCardIds = null;
+            this.onlinePassStage = data.passStage || (this.onlinePassStage ? this.onlinePassStage + 1 : 2);
+            this.onlinePassDirection = data.passDirection || HeartsRules.getTriplePassDirection(this.onlinePassStage);
             this.onlineIsPassingPhase = data.nextPhase === HeartsGame.PHASES.PASSING;
 
             if (window.soundEngine) window.soundEngine.playCardPass();
@@ -6569,13 +6572,25 @@ class TableUI {
                 if (this.passControlsEl) this.passControlsEl.classList.add('hidden');
                 this.showToast('Passing phase complete! Starting round.');
             } else {
-                this.showToast(`Pass completed! Next stage starting.`);
+                let dirLabel;
+                if (this.onlineGameMode === HeartsRules.GAME_MODES.TRIPLE_PASS || this.onlinePassStage > 1) {
+                    dirLabel = HeartsRules.getTriplePassLabel(this.onlinePassStage);
+                } else {
+                    dirLabel = HeartsRules.getPassDirectionLabel(this.onlinePassDirection);
+                }
+                this.showToast(`Pass completed! Next: ${dirLabel}`, 3000);
                 if (this.passControlsEl) {
                     this.passControlsEl.classList.remove('hidden');
+                    if (this.passDirectionText) {
+                        this.passDirectionText.textContent = dirLabel;
+                    }
                     if (this.btnConfirmPass) {
                         this.btnConfirmPass.disabled = true;
                         this.btnConfirmPass.textContent = 'Pass 3 Cards (0/3)';
                     }
+                }
+                if (this.statusBannerEl) {
+                    this.statusBannerEl.textContent = dirLabel;
                 }
             }
 
