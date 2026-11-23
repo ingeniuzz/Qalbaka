@@ -6161,6 +6161,9 @@ class TableUI {
     }
 
     handleCardClick(playerIndex, card) {
+        // Double-play guard: prevent two cards being played simultaneously
+        if (this._playLock) return;
+
         // Online Guest routing
         if (window.heartsNetwork && window.heartsNetwork.isConnected && !window.heartsNetwork.isHost) {
             // Passing phase for Online Guest
@@ -6214,8 +6217,10 @@ class TableUI {
                 return;
             }
 
-            // Send play to Host
+            // Send play to Host — set lock, released when server confirms play
+            this._playLock = true;
             window.heartsNetwork.playCard(card);
+            setTimeout(() => { this._playLock = false; }, 1500); // safety release
             return;
         }
 
@@ -6269,8 +6274,11 @@ class TableUI {
                 return;
             }
 
-            // Execute play
+            // Lock to prevent double-play; released after game state update
+            this._playLock = true;
             this.game.playCard(playerIndex, card);
+            // _playLock released by renderHands/updateControls after state update
+            setTimeout(() => { this._playLock = false; }, 800); // safety release
         }
     }
 
@@ -6375,7 +6383,17 @@ class TableUI {
     // ----------------------------------------------------
 
     showScoreboardModal() {
+        // For online guests: use received data instead of local game state
+        if (this.onlineIsGuest && !this.game) {
+            this.showOnlineGuestScoreboard();
+            return;
+        }
         if (!this.game || !this.modalScoreboard) return;
+        // If guest is in online mode but game obj also exists, still use online data
+        if (this.onlineIsGuest && this.onlineScoreHistory) {
+            this.showOnlineGuestScoreboard();
+            return;
+        }
         const tbody = document.getElementById('scoreboard-table-body');
         const headers = document.querySelectorAll('.scoreboard-player-header');
         
@@ -6410,6 +6428,47 @@ class TableUI {
             <td>${this.game.players[3].totalScore}</td>
         `;
         tbody.appendChild(totalRow);
+
+        this.modalScoreboard.classList.remove('hidden');
+    }
+
+    // Shows scoreboard for online guests (uses data received from host)
+    showOnlineGuestScoreboard() {
+        if (!this.modalScoreboard) return;
+        const tbody = document.getElementById('scoreboard-table-body');
+        const headers = document.querySelectorAll('.scoreboard-player-header');
+        const names = this.onlinePlayerNames || ['P1','P2','P3','P4'];
+        names.forEach((n, idx) => { if (headers[idx]) headers[idx].textContent = n; });
+        tbody.innerHTML = '';
+
+        const history = this.onlineScoreHistory || [];
+        history.forEach((roundScores, r) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td class="font-bold">Round ${r + 1}</td>
+                <td>${roundScores[0] ?? '-'}</td>
+                <td>${roundScores[1] ?? '-'}</td>
+                <td>${roundScores[2] ?? '-'}</td>
+                <td>${roundScores[3] ?? '-'}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        const totals = this.onlineTotalScores || [0,0,0,0];
+        const totalRow = document.createElement('tr');
+        totalRow.className = 'bg-amber-100 font-extrabold text-amber-900 border-t-2 border-amber-300';
+        totalRow.innerHTML = `
+            <td>TOTAL</td>
+            <td>${totals[0]}</td>
+            <td>${totals[1]}</td>
+            <td>${totals[2]}</td>
+            <td>${totals[3]}</td>
+        `;
+        tbody.appendChild(totalRow);
+
+        // Add "Next Round" button
+        const nextRoundBtn = document.getElementById('btn-next-round');
+        if (nextRoundBtn) nextRoundBtn.classList.add('hidden'); // guests don't control next round
 
         this.modalScoreboard.classList.remove('hidden');
     }
@@ -7205,6 +7264,18 @@ class TableUI {
                 if (window.soundEngine) window.soundEngine.playMoonFanfare();
             }
             this.updateOnlinePlayerBadges(data.totalScores);
+
+            // Track round score history for guest scoreboard
+            if (data.roundData && data.roundData.finalScores) {
+                if (!this.onlineScoreHistory) this.onlineScoreHistory = [];
+                this.onlineScoreHistory.push(data.roundData.finalScores);
+            }
+            if (data.totalScores) {
+                this.onlineTotalScores = data.totalScores;
+            }
+
+            // Show scoreboard for guest
+            this.showOnlineGuestScoreboard();
             this.showToast('Round completed! Preparing next round...', 3000);
         };
 
@@ -7451,6 +7522,12 @@ class TableUI {
             }
 
             if (roomParam) {
+                // Ensure main menu is hidden and game app is visible
+                const mainMenu = document.getElementById('screen-main-hearts');
+                if (mainMenu) mainMenu.style.display = 'none';
+                const app = document.getElementById('app');
+                if (app) app.style.display = 'flex';
+
                 // Instead of auto-joining with a hardcoded name, show the Join tab
                 // pre-filled with the room code & password so the friend can enter their own name.
                 setTimeout(() => {
