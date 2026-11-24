@@ -1396,7 +1396,7 @@ class Deck {
         }
     }
 
-    // Cryptographically strong random integer in [0, n)
+    // Cryptographically strong random integer from 0 to n-1
     static _secureRandInt(n) {
         // Use crypto.getRandomValues for true randomness
         if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
@@ -1433,6 +1433,10 @@ class Deck {
             hands[(i + startOffset) % numPlayers].push(this.cards[i]);
         }
         return hands;
+    }
+
+    draw() {
+        return this.cards.pop();
     }
 }
 
@@ -1702,7 +1706,12 @@ const TekkaRules = {
     cutForInitialDealer() {
         const deck = new Deck();
         deck.shuffle();
-        const cards = [deck.draw(), deck.draw(), deck.draw(), deck.draw()];
+        const cards = [
+            deck.cards.pop(),
+            deck.cards.pop(),
+            deck.cards.pop(),
+            deck.cards.pop()
+        ];
         const suitRank = { 'spades': 4, 'hearts': 3, 'diamonds': 2, 'clubs': 1 };
         let highestSeat = 0;
         let highestVal = -1;
