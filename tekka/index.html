@@ -265,7 +265,8 @@ html, body {
   text-align: center;
 }
 .player-bid-badge.active-bid { background: var(--gold); color: #1a1a1a; }
-.player-bid-badge.pass { background: rgba(255,255,255,0.15); color: var(--text-muted); }
+.player-bid-badge.pass { background: rgba(59, 130, 246, 0.25); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.4); }
+.player-bid-badge.teer { background: rgba(239, 68, 68, 0.25); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.4); }
 
 /* Position zones */
 .pos-north {
@@ -508,7 +509,8 @@ html, body {
   min-width: 48px;
 }
 .bid-btn:active { background: rgba(212,160,23,0.4); transform: scale(0.95); }
-.bid-btn.bid-pass { border-color: rgba(255,255,255,0.3); background: rgba(255,255,255,0.08); color: var(--text-muted); font-size: 0.85rem; }
+.bid-btn.bid-pass { border-color: rgba(59, 130, 246, 0.4); background: rgba(59, 130, 246, 0.15); color: #93c5fd; font-size: 0.85rem; }
+.bid-btn.bid-teer { border-color: rgba(239, 68, 68, 0.4); background: rgba(239, 68, 68, 0.15); color: #fca5a5; font-size: 0.85rem; }
 .bid-btn.bid-double13 { border-color: #f59e0b; background: rgba(245,158,11,0.2); color: #fde68a; font-size: 0.8rem; letter-spacing: -0.3px; }
 
 /* ====================== TOAST ====================== */
@@ -1649,6 +1651,7 @@ const PHASE = {
 
 const BID = {
     PASS: 'pass',
+    TEER: 'teer',
     LARIES: 'laries',
     BAWAND: 'bawand',
     DOUBLE13: 'laries'
@@ -1695,7 +1698,7 @@ const TekkaRules = {
 
     // Returns numeric rank of bid for comparison
     bidValue(b) {
-        if (b === null || b === undefined || b === BID.PASS || b === 'pass') return 0;
+        if (b === null || b === undefined || b === BID.PASS || b === 'pass' || b === BID.TEER || b === 'teer') return 0;
         if (b === BID.BAWAND || b === 'bawand') return 30;
         if (b === BID.LARIES || b === 'laries' || b === 'double13' || b === BID.DOUBLE13) return 20;
         return Number(b) || 0;
@@ -1703,8 +1706,8 @@ const TekkaRules = {
 
     // Returns true if newBid is strictly higher than currentBid
     isHigherBid(newBid, currentBid) {
-        const isPassNew = (newBid === BID.PASS || newBid === 'pass');
-        const isPassCur = (currentBid === null || currentBid === undefined || currentBid === BID.PASS || currentBid === 'pass');
+        const isPassNew = (newBid === BID.PASS || newBid === 'pass' || newBid === BID.TEER || newBid === 'teer');
+        const isPassCur = (currentBid === null || currentBid === undefined || currentBid === BID.PASS || currentBid === 'pass' || currentBid === BID.TEER || currentBid === 'teer');
         if (isPassCur) return !isPassNew;
         if (isPassNew) return false;
         return this.bidValue(newBid) > this.bidValue(currentBid);
@@ -1719,6 +1722,7 @@ const TekkaRules = {
         if (this.isHigherBid(BID.LARIES, currentHighBid)) legal.push(BID.LARIES);
         if (this.isHigherBid(BID.BAWAND, currentHighBid)) legal.push(BID.BAWAND);
         legal.push(BID.PASS);
+        legal.push(BID.TEER);
         return legal;
     },
 
@@ -1852,218 +1856,403 @@ class TekkaAI {
     /**
      * Decide what this bot should bid given:
      * - hand: Card[] (this bot's hand)
-     * - currentHighBid: number | 'double13' | null (highest bid so far)
+     * - currentHighBid: number | 'laries' | 'bawand' | null (highest bid so far)
      * - biddingPosition: 0=first, 1=second, 2=third, 3=last bidder
-     * - partnerBid: number | 'pass' | null (partner's bid if already made)
+     * - partnerBid: number | 'pass' | 'teer' | null (partner's bid if already made)
      * - difficulty: 'easy' | 'medium' | 'hard'
-     * Returns: number | 'double13' | 'pass'
+     * Returns: number | 'laries' | 'bawand' | 'pass' | 'teer'
      */
     static decideBid(hand, currentHighBid, biddingPosition, partnerBid, difficulty = 'hard') {
         const { pts, suitLengths } = TekkaRules.handStrength(hand);
 
-        // Best suit for trump (longest + highest value)
-        const bestSuit = this._bestTrumpSuit(hand, suitLengths);
-        const bestSuitCards = hand.filter(c => c.suit === bestSuit);
-        const bestSuitHighCards = bestSuitCards.filter(c => c.value >= 11).length; // J+
+        // Find best suit for trump and calculate own tricks in that suit
+        const { bestSuit, ownTricks } = this._evaluateBestSuitAndTricks(hand, suitLengths);
 
-        // Estimate how many tricks we can win
-        let estimatedTricks = this._estimateTricks(pts, bestSuit, suitLengths, hand);
-
-        // If partner already made a good bid, reduce expectations (they'll cover some)
-        if (partnerBid && partnerBid !== BID.PASS && partnerBid !== null) {
-            const partnerEstimate = Number(partnerBid) - 4;
-            // Don't double-count with partner
-            estimatedTricks = Math.max(estimatedTricks - 2, estimatedTricks * 0.6);
-        }
-
-        // Add randomness based on difficulty
-        const noise = difficulty === 'easy' ? (Math.random() - 0.5) * 2 :
-                      difficulty === 'medium' ? (Math.random() - 0.5) * 1 : 0;
-        estimatedTricks = Math.round(estimatedTricks + noise);
-
-        // Determine bid
-        let targetBid = Math.min(Math.max(estimatedTricks, MIN_BID), MAX_BID);
-
-        // Check if Double 13 makes sense (very strong hand)
-        if (pts >= 22 && bestSuitCards.length >= 7 && bestSuitHighCards >= 4 &&
-            difficulty === 'hard' && !partnerBid) {
-            if (TekkaRules.isHigherBid(BID.DOUBLE13, currentHighBid)) {
-                return BID.DOUBLE13;
+        // Calculate partner support based on user rules:
+        // - Teer: partner has 0-1 trick -> count ~0.5
+        // - Pass: partner has 1-3 tricks (usually 1-2) -> count ~1.5
+        // - Unknown (not yet bid): partner should be counted on for at least 1 trick -> count 1.0
+        let partnerSupport = 1.0;
+        if (partnerBid === BID.TEER || partnerBid === 'teer') {
+            partnerSupport = 0.5;
+        } else if (partnerBid === BID.PASS || partnerBid === 'pass') {
+            partnerSupport = 1.5;
+        } else if (partnerBid !== null && partnerBid !== undefined) {
+            // Partner made a numeric bid or special contract
+            const partnerVal = TekkaRules.bidValue(partnerBid);
+            if (partnerVal >= 8) {
+                // Partner expects to win tricks. Check if we can bid Laries together!
+                // Laries requires total team tricks >= 13 AND holding key Aces and Kings
+                if (partnerVal >= 9 && ownTricks >= 6) {
+                    const hasKeyHonors = this._hasKeyHonorsForLaries(hand);
+                    if (hasKeyHonors && TekkaRules.isHigherBid(BID.LARIES, currentHighBid)) {
+                        return BID.LARIES;
+                    }
+                }
+                partnerSupport = Math.max(1.0, partnerVal - 7);
             }
         }
 
-        // Find highest legal bid up to target
-        let chosenBid = BID.PASS;
-        for (let n = MIN_BID; n <= targetBid; n++) {
-            if (TekkaRules.isHigherBid(n, currentHighBid)) {
-                chosenBid = n;
+        // Bawand check: can bot win all 13 tricks completely on its own?
+        if (ownTricks >= 12.5 && this._canMakeBawandSolo(hand, bestSuit)) {
+            if (TekkaRules.isHigherBid(BID.BAWAND, currentHighBid)) {
+                return BID.BAWAND;
             }
         }
 
-        // Last bidder special: if all others passed and we must bid 8
-        if (biddingPosition === 3 && currentHighBid === null && chosenBid === BID.PASS) {
-            // Forced bid of 8 — this is handled in game.js
+        // Total estimated tricks for team
+        let totalExpected = Math.round(ownTricks + partnerSupport);
+
+        // Difficulty adjustment (hard = realistic, medium/easy = slightly less optimal)
+        if (difficulty === 'easy') {
+            totalExpected += (Math.random() > 0.5 ? 1 : -1);
+        }
+
+        const currentHighVal = TekkaRules.bidValue(currentHighBid);
+
+        // Can we make a legal bid higher than currentHighBid?
+        if (totalExpected >= MIN_BID && totalExpected > currentHighVal) {
+            const targetBid = Math.min(MAX_BID, totalExpected);
+            // Ensure bid is higher than current
+            const bidToMake = Math.max(currentHighVal + 1, targetBid);
+            if (bidToMake <= Math.min(MAX_BID, totalExpected + 1)) {
+                return Math.min(MAX_BID, bidToMake);
+            }
+        }
+
+        // Cannot make a higher bid or hand is too weak (< 8 tricks total).
+        // Choose between Pass and Teer:
+        // Pass: "ik zou je kunnen helpen met tricks pakken" (1-3 tricks, ownTricks >= 1.5)
+        // Teer: "ik zou niet of bijna niet kunnen helpen met tricks pakken" (0-1 trick, ownTricks < 1.5)
+        if (ownTricks >= 1.5) {
             return BID.PASS;
+        } else {
+            return BID.TEER;
         }
-
-        return chosenBid;
     }
 
-    static _bestTrumpSuit(hand, suitLengths) {
-        let best = SUITS[0];
-        let bestScore = -1;
+    /**
+     * Evaluate each suit as potential trump and return the best suit + estimated tricks.
+     */
+    static _evaluateBestSuitAndTricks(hand, suitLengths) {
+        let bestSuit = SUITS[0];
+        let maxTricks = -1;
+
         for (const suit of SUITS) {
-            const cards = hand.filter(c => c.suit === suit);
-            const len = cards.length;
-            const highCards = cards.filter(c => c.value >= 11).length;
-            const score = len * 2 + highCards * 3;
-            if (score > bestScore) {
-                bestScore = score;
-                best = suit;
+            const tr = this._estimateTricksForSuit(suit, suitLengths, hand);
+            if (tr > maxTricks) {
+                maxTricks = tr;
+                bestSuit = suit;
             }
         }
-        return best;
+
+        return { bestSuit, ownTricks: maxTricks };
     }
 
-    static _estimateTricks(pts, bestSuit, suitLengths, hand) {
-        // Base from honor points
-        let tricks = 4 + Math.floor(pts / 3);
+    static _estimateTricksForSuit(trumpCandidate, suitLengths, hand) {
+        const trumpCards = hand.filter(c => c.suit === trumpCandidate);
+        const trumpLen = trumpCards.length;
+        let tricks = 0;
 
-        // Trump length bonus
-        const trumpLen = suitLengths[bestSuit];
-        if (trumpLen >= 5) tricks += 1;
-        if (trumpLen >= 6) tricks += 1;
-        if (trumpLen >= 7) tricks += 2;
+        // Trump honors
+        const hasA = trumpCards.some(c => c.value === 14);
+        const hasK = trumpCards.some(c => c.value === 13);
+        const hasQ = trumpCards.some(c => c.value === 12);
+        const hasJ = trumpCards.some(c => c.value === 11);
 
-        // Void/singleton bonus
+        if (hasA) tricks += 1.0;
+        if (hasK) tricks += (hasA ? 1.0 : 0.8);
+        if (hasQ) tricks += ((hasA && hasK) ? 0.9 : 0.5);
+        if (hasJ && trumpLen >= 4) tricks += 0.4;
+
+        // Trump length power: length cards beyond 4 generate tricks
+        if (trumpLen === 5) tricks += 1.0;
+        else if (trumpLen === 6) tricks += 2.2;
+        else if (trumpLen >= 7) tricks += 3.5 + (trumpLen - 7) * 1.0;
+
+        // Outside suits (Aces, protected Kings, ruffing power)
+        for (const suit of SUITS) {
+            if (suit === trumpCandidate) continue;
+            const sideCards = hand.filter(c => c.suit === suit);
+            const sideLen = sideCards.length;
+            const sA = sideCards.some(c => c.value === 14);
+            const sK = sideCards.some(c => c.value === 13);
+            const sQ = sideCards.some(c => c.value === 12);
+
+            if (sA) tricks += 1.0;
+            if (sK && sideLen >= 2) tricks += (sA ? 0.9 : 0.7);
+            if (sQ && sideLen >= 3 && sK) tricks += 0.5;
+
+            // Ruffing potential if we have solid trumps (>= 4)
+            if (trumpLen >= 4) {
+                if (sideLen === 0) tricks += 1.0; // Void in side suit
+                else if (sideLen === 1 && !sA) tricks += 0.5; // Singleton
+            }
+        }
+
+        return tricks;
+    }
+
+    /**
+     * Laries condition: team wins all 13 tricks.
+     * To guarantee this, bot must have Aces and Kings so opponents cannot win an opening lead.
+     */
+    static _hasKeyHonorsForLaries(hand) {
+        let aceCount = 0;
+        let kingCount = 0;
+        for (const c of hand) {
+            if (c.value === 14) aceCount++;
+            if (c.value === 13) kingCount++;
+        }
+        // At least 2 Aces and at least 1 King, and at least 4 honors total
+        return (aceCount >= 2 && kingCount >= 1 && (aceCount + kingCount) >= 4);
+    }
+
+    /**
+     * Bawand condition: solo win all 13 tricks.
+     * Requires 7+ solid trumps (A, K, Q, J) and all side suits covered with Aces or void.
+     */
+    static _canMakeBawandSolo(hand, bestSuit) {
+        const trumpCards = hand.filter(c => c.suit === bestSuit);
+        if (trumpCards.length < 7) return false;
+        const hasA = trumpCards.some(c => c.value === 14);
+        const hasK = trumpCards.some(c => c.value === 13);
+        const hasQ = trumpCards.some(c => c.value === 12);
+        const hasJ = trumpCards.some(c => c.value === 11);
+        if (!hasA || !hasK || !hasQ || !hasJ) return false;
+
+        // Side suits must have Ace or length <= 1
         for (const suit of SUITS) {
             if (suit === bestSuit) continue;
-            if (suitLengths[suit] === 0) tricks += 1; // void, can trump
-            if (suitLengths[suit] === 1) tricks += 0.5;
+            const sideCards = hand.filter(c => c.suit === suit);
+            if (sideCards.length > 2) return false;
+            if (sideCards.length > 0 && !sideCards.some(c => c.value === 14)) {
+                if (sideCards.length > 1) return false;
+            }
         }
-
-        return Math.round(tricks);
+        return true;
     }
 
     // -------------------------------------------------------------------------
     // TRUMP SELECTION (declarant leading first card)
     // -------------------------------------------------------------------------
 
-    /**
-     * Choose which card to lead as trump-revealer (declarant's first play).
-     * Best strategy: lead highest trump card to establish the suit.
-     */
     static chooseTrumpLead(hand, difficulty = 'hard') {
         const { suitLengths } = TekkaRules.handStrength(hand);
-        const bestSuit = this._bestTrumpSuit(hand, suitLengths);
+        const { bestSuit } = this._evaluateBestSuitAndTricks(hand, suitLengths);
         const trumpCards = hand.filter(c => c.suit === bestSuit);
 
-        // Lead the highest trump card to establish dominance
+        // Lead highest trump card to reveal trump and establish dominance
         trumpCards.sort((a, b) => b.value - a.value);
-        return trumpCards[0];
+        return trumpCards[0] || hand[0];
     }
 
     // -------------------------------------------------------------------------
-    // CARD PLAY
+    // ANNOUNCEMENT DECISION (Tapkey / Kaat)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Decide if bot should announce 'tapkey' or 'kaat' when playing a card.
+     * - Kaat: playing the last card of suit S (now void in S).
+     * - Tapkey: playing a lower card in suit S while still holding a high card (A/K/Q) in S.
+     */
+    static decideAnnouncement(hand, card, trick, trump, botIndex, gameState) {
+        if (!card) return null;
+        const suit = card.suit;
+        if (suit === trump) return null; // Announcements are on side suits
+
+        const remainingInSuit = hand.filter(c => (c.id !== card.id) && c.suit === suit);
+
+        // If no cards left in this suit, announce Kaat ("heb niet meer")
+        if (remainingInSuit.length === 0) {
+            return 'kaat';
+        }
+
+        // If still holding an Ace, King, or Queen in this suit, announce Tapkey ("kom weer")
+        const holdsHighCard = remainingInSuit.some(c => c.value >= 12);
+        if (holdsHighCard && card.value < 14) {
+            return 'tapkey';
+        }
+
+        return null;
+    }
+
+    // -------------------------------------------------------------------------
+    // CARD PLAY STRATEGY
     // -------------------------------------------------------------------------
 
     /**
      * Choose a card to play given the game state.
-     * @param {Card[]} hand - bot's current hand
-     * @param {object[]} trick - current trick [{card, playerIndex}, ...]
-     * @param {string} trump - trump suit
-     * @param {number} botIndex - this bot's seat index
-     * @param {object} gameState - full game state for context
-     * @param {string} difficulty
      */
     static chooseCard(hand, trick, trump, botIndex, gameState, difficulty = 'hard') {
         const legal = TekkaRules.legalCards(hand, trick, trump);
         if (legal.length === 1) return legal[0];
 
-        const isDeclarant = TekkaRules.teamOf(botIndex) === gameState.declarantTeam;
-        const isLeading = !trick || trick.length === 0;
+        const isLeading = (!trick || trick.length === 0);
+        const partnerSeat = TekkaRules.partnerOf(botIndex);
+        const myTeam = TekkaRules.teamOf(botIndex);
+        const isDeclarantTeam = (myTeam === gameState.declarantTeam);
 
-        if (isDeclarant) {
-            return this._playAsDeclarant(legal, trick, trump, botIndex, gameState, difficulty);
+        // Information gathered from game state
+        const partnerAnnouncements = gameState.announcements ? gameState.announcements[partnerSeat] : null;
+        const partnerTapkeySuits = partnerAnnouncements?.tapkey || [];
+        const partnerKaatSuits = partnerAnnouncements?.kaat || [];
+        const partnerVoidInTrump = !!(gameState.voidSuits?.[partnerSeat]?.includes(trump));
+
+        // Trumps tracking
+        const allPlayed = gameState.allPlayedCards || [];
+        const trumpsPlayedCount = allPlayed.filter(c => c.suit === trump).length +
+            (trick ? trick.filter(e => e.card.suit === trump).length : 0);
+        const myTrumps = hand.filter(c => c.suit === trump);
+        const remainingTrumpsOutside = 13 - myTrumps.length - trumpsPlayedCount;
+        const opponentsHaveTrumps = (remainingTrumpsOutside > 0);
+
+        if (isLeading) {
+            return this._chooseLeadCard({
+                legal, hand, trump, botIndex, isDeclarantTeam,
+                partnerTapkeySuits, partnerKaatSuits, partnerVoidInTrump,
+                myTrumps, opponentsHaveTrumps, gameState, difficulty
+            });
         } else {
-            return this._playAsDefender(legal, trick, trump, botIndex, gameState, difficulty);
+            return this._chooseFollowCard({
+                legal, hand, trick, trump, botIndex, myTeam,
+                partnerTapkeySuits, partnerKaatSuits, gameState, difficulty
+            });
         }
     }
 
-    // --- Declarant strategy: win as many tricks as possible ---
-    static _playAsDeclarant(legal, trick, trump, botIndex, gameState, difficulty) {
-        const isLeading = !trick || trick.length === 0;
+    // --- LEADING STRATEGY ---
+    static _chooseLeadCard(ctx) {
+        const {
+            legal, trump, isDeclarantTeam,
+            partnerTapkeySuits, partnerKaatSuits, partnerVoidInTrump,
+            myTrumps, opponentsHaveTrumps
+        } = ctx;
 
-        if (isLeading) {
-            // Lead: play highest trump to draw out opponent trumps, or highest card in long suit
-            const trumpCards = legal.filter(c => c.suit === trump);
-            if (trumpCards.length > 0 && difficulty !== 'easy') {
-                trumpCards.sort((a, b) => b.value - a.value);
-                return trumpCards[0];
+        // 1. TRUMP PULLING:
+        // When bot is declarant (or has trump control) and opponents still hold trumps,
+        // lead highest trump to pull opponents' trumps.
+        if (isDeclarantTeam && opponentsHaveTrumps && myTrumps.length > 0) {
+            const legalTrumps = legal.filter(c => c.suit === trump);
+            if (legalTrumps.length > 0) {
+                legalTrumps.sort((a, b) => b.value - a.value);
+                return legalTrumps[0];
             }
-            // Lead highest card
-            return this._highestCard(legal);
         }
 
-        // Following: try to win the trick
-        const ledSuit = trick[0].card.suit;
-        const currentWinner = this._currentTrickWinner(trick, trump);
-        const currentWinnerTeam = TekkaRules.teamOf(currentWinner.playerIndex);
-        const myTeam = TekkaRules.teamOf(botIndex);
-
-        if (currentWinnerTeam === myTeam) {
-            // Partner is winning — play low to save high cards
-            return this._lowestCard(legal);
+        // 2. PARTNER'S TAPKEY SUIT:
+        // Partner asked "kom weer" with a high card. Lead suit S so partner can win!
+        for (const tSuit of partnerTapkeySuits) {
+            const cardsInSuit = legal.filter(c => c.suit === tSuit);
+            if (cardsInSuit.length > 0) {
+                // Lead lowest card in that suit to let partner's high card take the trick
+                cardsInSuit.sort((a, b) => a.value - b.value);
+                return cardsInSuit[0];
+            }
         }
 
-        // Try to win the trick
-        const canWin = legal.filter(c => this._beatsCurrentWinner(c, currentWinner.card, ledSuit, trump));
-        if (canWin.length > 0) {
-            // Play lowest winning card
-            canWin.sort((a, b) => a.value - b.value);
-            return canWin[0];
+        // 3. PARTNER'S KAAT SUIT:
+        // Partner has no more cards in suit K and can trump it!
+        // User rule: "tenzij hij zelf de hoge van die kaart heeft, dan wel"
+        if (!partnerVoidInTrump) {
+            for (const kSuit of partnerKaatSuits) {
+                const cardsInSuit = legal.filter(c => c.suit === kSuit);
+                if (cardsInSuit.length > 0) {
+                    const topCard = cardsInSuit.reduce((best, c) => c.value > best.value ? c : best, cardsInSuit[0]);
+                    // If bot has the master Ace, cash it directly!
+                    if (topCard.value === 14) {
+                        return topCard;
+                    }
+                    // Otherwise lead a low card so partner can ruff/cut it with trump!
+                    cardsInSuit.sort((a, b) => a.value - b.value);
+                    return cardsInSuit[0];
+                }
+            }
         }
 
-        // Can't win — throw lowest card
+        // 4. CASH OUTSIDE WINNERS (Aces or master cards)
+        const nonTrumpAces = legal.filter(c => c.suit !== trump && c.value === 14);
+        if (nonTrumpAces.length > 0) {
+            return nonTrumpAces[0];
+        }
+
+        // 5. IF WE HAVE TRUMP LEAD REMAINING (even if opponents are out, run winning trumps)
+        if (myTrumps.length > 0) {
+            const legalTrumps = legal.filter(c => c.suit === trump);
+            if (legalTrumps.length > 0 && isDeclarantTeam) {
+                legalTrumps.sort((a, b) => b.value - a.value);
+                if (legalTrumps[0].value >= 12) {
+                    return legalTrumps[0];
+                }
+            }
+        }
+
+        // 6. DEFAULT LEAD: highest card in longest safe side suit, or lowest card
+        const nonTrump = legal.filter(c => c.suit !== trump);
+        if (nonTrump.length > 0) {
+            nonTrump.sort((a, b) => b.value - a.value);
+            return nonTrump[0];
+        }
+
         return this._lowestCard(legal);
     }
 
-    // --- Defender strategy: prevent declarant from making bid ---
-    static _playAsDefender(legal, trick, trump, botIndex, gameState, difficulty) {
-        const isLeading = !trick || trick.length === 0;
+    // --- FOLLOWING STRATEGY ---
+    static _chooseFollowCard(ctx) {
+        const { legal, trick, trump, myTeam, partnerTapkeySuits } = ctx;
+        const ledSuit = trick[0].card.suit;
+        const currentWinner = this._currentTrickWinner(trick, trump);
+        const isPartnerWinning = (TekkaRules.teamOf(currentWinner.playerIndex) === myTeam);
 
-        if (isLeading) {
-            // Lead: play safe card — highest non-trump, or lowest overall
+        const followingSuit = legal.filter(c => c.suit === ledSuit);
+
+        if (followingSuit.length > 0) {
+            // MUST FOLLOW SUIT
+            if (isPartnerWinning) {
+                // Partner is already winning the trick -> play lowest card to save high cards
+                return this._lowestCard(followingSuit);
+            }
+
+            // Opponent is currently winning
+            // Try to beat current winner
+            const canWin = followingSuit.filter(c => this._beatsCurrentWinner(c, currentWinner.card, ledSuit, trump));
+            if (canWin.length > 0) {
+                // If partner led this suit because of Tapkey or bot announced Tapkey, play high!
+                canWin.sort((a, b) => a.value - b.value);
+                return canWin[0]; // Lowest card that still wins
+            }
+
+            // Cannot win -> discard lowest
+            return this._lowestCard(followingSuit);
+        }
+
+        // VOID IN LED SUIT (CAN RUFF OR DISCARD)
+        if (isPartnerWinning) {
+            // Partner is already winning the trick! Do NOT waste a trump!
+            // Discard lowest useless non-trump card
             const nonTrump = legal.filter(c => c.suit !== trump);
             if (nonTrump.length > 0) {
-                nonTrump.sort((a, b) => b.value - a.value);
-                // Lead high to try to win tricks from declarant
-                if (difficulty === 'hard') return nonTrump[0];
-                return nonTrump[Math.floor(nonTrump.length / 2)];
+                return this._lowestCard(nonTrump);
             }
             return this._lowestCard(legal);
         }
 
-        const ledSuit = trick[0].card.suit;
-        const currentWinner = this._currentTrickWinner(trick, trump);
-        const currentWinnerTeam = TekkaRules.teamOf(currentWinner.playerIndex);
-        const myTeam = TekkaRules.teamOf(botIndex);
-
-        if (currentWinnerTeam === myTeam) {
-            // Partner winning — throw low useless card
-            return this._lowestCard(legal);
+        // Opponents winning: try to trump/cut!
+        const trumps = legal.filter(c => c.suit === trump);
+        if (trumps.length > 0) {
+            const winningTrumps = trumps.filter(c => this._beatsCurrentWinner(c, currentWinner.card, ledSuit, trump));
+            if (winningTrumps.length > 0) {
+                winningTrumps.sort((a, b) => a.value - b.value);
+                // Win with the lowest winning trump
+                return winningTrumps[0];
+            }
         }
 
-        // Opponents winning — try to win the trick
-        const canWin = legal.filter(c => this._beatsCurrentWinner(c, currentWinner.card, ledSuit, trump));
-        if (canWin.length > 0) {
-            canWin.sort((a, b) => a.value - b.value);
-            return canWin[0];
-        }
-
-        // Can't win — throw lowest non-trump (preserve trumps for later)
+        // Cannot win with trump -> slough lowest useless card
         const nonTrump = legal.filter(c => c.suit !== trump);
-        if (nonTrump.length > 0) return this._lowestCard(nonTrump);
+        if (nonTrump.length > 0) {
+            return this._lowestCard(nonTrump);
+        }
         return this._lowestCard(legal);
     }
 
@@ -2186,6 +2375,16 @@ class TekkaGame {
         this.contractAmount = null;
         this.contractType = null;
 
+        // Announcements and card tracking
+        this.announcements = {
+            0: { tapkey: [], kaat: [] },
+            1: { tapkey: [], kaat: [] },
+            2: { tapkey: [], kaat: [] },
+            3: { tapkey: [], kaat: [] }
+        };
+        this.voidSuits = { 0: [], 1: [], 2: [], 3: [] };
+        this.allPlayedCards = [];
+
         // Set up bidding order
         this.biddingOrder = TekkaRules.biddingOrder(this.dealer);
         this.biddingStep = 0;
@@ -2194,6 +2393,40 @@ class TekkaGame {
         this.activePlayer = this.biddingOrder[0];
 
         return this;
+    }
+
+    recordAnnouncement(seatIndex, type, suit) {
+        seatIndex = Number(seatIndex);
+        if (!this.announcements) {
+            this.announcements = {
+                0: { tapkey: [], kaat: [] },
+                1: { tapkey: [], kaat: [] },
+                2: { tapkey: [], kaat: [] },
+                3: { tapkey: [], kaat: [] }
+            };
+        }
+        if (!this.announcements[seatIndex]) {
+            this.announcements[seatIndex] = { tapkey: [], kaat: [] };
+        }
+        if (!this.voidSuits) {
+            this.voidSuits = { 0: [], 1: [], 2: [], 3: [] };
+        }
+        if (!this.voidSuits[seatIndex]) {
+            this.voidSuits[seatIndex] = [];
+        }
+
+        if (type === 'tapkey') {
+            if (!this.announcements[seatIndex].tapkey.includes(suit)) {
+                this.announcements[seatIndex].tapkey.push(suit);
+            }
+        } else if (type === 'kaat') {
+            if (!this.announcements[seatIndex].kaat.includes(suit)) {
+                this.announcements[seatIndex].kaat.push(suit);
+            }
+            if (!this.voidSuits[seatIndex].includes(suit)) {
+                this.voidSuits[seatIndex].push(suit);
+            }
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -2227,17 +2460,18 @@ class TekkaGame {
         }
 
         const isPass = (bid === BID.PASS || bid === 'pass');
+        const isTeer = (bid === BID.TEER || bid === 'teer');
         const isBawand = (bid === BID.BAWAND || bid === 'bawand');
         const isLaries = (bid === BID.LARIES || bid === 'laries' || bid === 'double13' || bid === BID.DOUBLE13);
-        const cleanBid = isPass ? BID.PASS : isBawand ? BID.BAWAND : isLaries ? BID.LARIES : Number(bid);
+        const cleanBid = isPass ? BID.PASS : isTeer ? BID.TEER : isBawand ? BID.BAWAND : isLaries ? BID.LARIES : Number(bid);
 
-        if (cleanBid !== BID.PASS && !TekkaRules.isHigherBid(cleanBid, this.highBid)) {
+        if (cleanBid !== BID.PASS && cleanBid !== BID.TEER && !TekkaRules.isHigherBid(cleanBid, this.highBid)) {
             return { error: 'Bid must be higher than current bid' };
         }
 
         this.bids[seatIndex] = cleanBid;
 
-        if (cleanBid !== BID.PASS) {
+        if (cleanBid !== BID.PASS && cleanBid !== BID.TEER) {
             this.highBid = cleanBid;
             this.highBidder = seatIndex;
         }
@@ -2255,10 +2489,10 @@ class TekkaGame {
     }
 
     _resolveBidding() {
-        const nonPasses = this.bids.filter(b => b !== null && b !== BID.PASS);
+        const nonPasses = this.bids.filter(b => b !== null && b !== BID.PASS && b !== BID.TEER);
 
         if (nonPasses.length === 0) {
-            // ALL PASSED: special rule — last bidder must bid 8
+            // ALL PASSED / TEERED: special rule — last bidder must bid 8
             this.forcedEight = true;
             const lastBidder = this.biddingOrder[3];
             this.bids[lastBidder] = 8;
@@ -2336,6 +2570,21 @@ class TekkaGame {
 
         // Add to current trick
         this.currentTrick.push({ card: playedCard, playerIndex: seatIndex });
+
+        if (!this.allPlayedCards) this.allPlayedCards = [];
+        this.allPlayedCards.push(playedCard);
+
+        // Check void if following suit
+        if (this.currentTrick.length > 1) {
+            const ledSuit = this.currentTrick[0].card.suit;
+            if (playedCard.suit !== ledSuit) {
+                if (!this.voidSuits) this.voidSuits = { 0: [], 1: [], 2: [], 3: [] };
+                if (!this.voidSuits[seatIndex]) this.voidSuits[seatIndex] = [];
+                if (!this.voidSuits[seatIndex].includes(ledSuit)) {
+                    this.voidSuits[seatIndex].push(ledSuit);
+                }
+            }
+        }
 
         // Check if trick is complete (4 cards played)
         if (this.currentTrick.length === 4) {
@@ -2578,6 +2827,8 @@ class TekkaGame {
             activePlayer: this.activePlayer,
             biddingStep: this.biddingStep,
             biddingOrder: this.biddingOrder,
+            announcements: this.announcements,
+            voidSuits: this.voidSuits,
             handCounts: this.hands.map(h => h.length)
         };
     }
@@ -3387,6 +3638,8 @@ class TekkaUI {
         this.game.tricksWon = state.tricksWon || [0, 0, 0, 0];
         this.game.trickNumber = state.trickNumber || 1;
         this.game.teamScores = state.teamScores || [0, 0];
+        if (state.announcements) this.game.announcements = state.announcements;
+        if (state.voidSuits) this.game.voidSuits = state.voidSuits;
 
         // Restore hands (reconstruct Card objects)
         if (state.hands) {
@@ -3608,11 +3861,21 @@ class TekkaUI {
         legalBids.forEach(bid => {
             const btn = document.createElement('button');
             let cls = 'bid-btn';
-            if (bid === BID.PASS) cls += ' bid-pass';
-            else if (bid === BID.BAWAND) cls += ' bid-bawand';
-            else if (bid === BID.LARIES || bid === 'double13') cls += ' bid-double13';
+            let label = this._formatBid(bid);
+
+            if (bid === BID.PASS || bid === 'pass') {
+                cls += ' bid-pass';
+                label = 'Pass (1-3)';
+            } else if (bid === BID.TEER || bid === 'teer') {
+                cls += ' bid-teer';
+                label = 'Teer (0-1)';
+            } else if (bid === BID.BAWAND || bid === 'bawand') {
+                cls += ' bid-bawand';
+            } else if (bid === BID.LARIES || bid === 'laries' || bid === 'double13' || bid === BID.DOUBLE13) {
+                cls += ' bid-double13';
+            }
             btn.className = cls;
-            btn.textContent = this._formatBid(bid);
+            btn.textContent = label;
             btn.addEventListener('click', () => {
                 const s = Number(forSeat);
                 if (this.onlineMode) {
@@ -3663,14 +3926,18 @@ class TekkaUI {
         const badgeEl = document.getElementById(`player-bid-${seatIndex}`);
         if (badgeEl) {
             badgeEl.textContent = this._formatBid(bid);
-            badgeEl.className = 'player-bid-badge ' + (bid === BID.PASS ? 'pass' : 'active-bid');
+            let badgeCls = 'player-bid-badge active-bid';
+            if (bid === BID.PASS || bid === 'pass') badgeCls = 'player-bid-badge pass';
+            else if (bid === BID.TEER || bid === 'teer') badgeCls = 'player-bid-badge teer';
+            badgeEl.className = badgeCls;
             badgeEl.classList.remove('hidden');
         }
     }
 
     _formatBid(bid) {
         if (bid === null) return '—';
-        if (bid === BID.PASS) return 'Pass';
+        if (bid === BID.PASS || bid === 'pass') return 'Pass';
+        if (bid === BID.TEER || bid === 'teer') return 'Teer';
         if (bid === BID.BAWAND) return '👑 Bawand (52)';
         if (bid === BID.LARIES || bid === 'double13') return '★ Laries (26)';
         return String(bid);
@@ -3756,6 +4023,20 @@ class TekkaUI {
                     hand, this.game.currentTrick, this.game.trump,
                     nextPlayer, this.game, this.game.difficulty
                 );
+
+                // Check if bot should announce Tapkey or Kaat
+                const announcement = TekkaAI.decideAnnouncement(
+                    hand, card, this.game.currentTrick, this.game.trump,
+                    nextPlayer, this.game
+                );
+                if (announcement) {
+                    this.game.recordAnnouncement(nextPlayer, announcement, card.suit);
+                    this.showAnnouncement(nextPlayer, announcement);
+                    if (this.onlineMode && this.net.isHost) {
+                        this.net.sendCardAnnouncement(card, announcement);
+                    }
+                }
+
                 if (this.onlineMode && this.net.isHost) {
                     this.net.sendCardPlayed(card, nextPlayer);
                 }
@@ -4029,6 +4310,7 @@ class TekkaUI {
         this._disableHumanPlay();
 
         if (announcement) {
+            this.game.recordAnnouncement(mySeat, announcement, card.suit);
             this.showAnnouncement(mySeat, announcement);
             if (this.onlineMode) this.net.sendCardAnnouncement(card, announcement);
         }
@@ -4512,6 +4794,9 @@ class TekkaUI {
         };
 
         this.net.onCardAnnounce = (data) => {
+            if (data && data.card && data.card.suit) {
+                this.game.recordAnnouncement(Number(data.seat), data.announcement, data.card.suit);
+            }
             this.showAnnouncement(Number(data.seat), data.announcement);
         };
 
