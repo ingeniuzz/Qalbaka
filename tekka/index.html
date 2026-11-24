@@ -1659,13 +1659,15 @@ const BID = {
 
 const TARGET_SCORE = 104;
 const TOTAL_TRICKS = 13;
-const MIN_BID = 8;
+const MIN_BID = 9;              // Regular voluntary opening bids must be 9 or higher
+const FORCED_MIN_BID = 8;       // Last bidder forced minimum when all pass
 const MAX_BID = 13;
 
 const TekkaRules = {
 
-    // Counter-clockwise next player: South→East→North→West→South
-    // Indices: 0→3→2→1→0
+    // Counter-clockwise next player: South(0)→East(3)→North(2)→West(1)→South(0)
+    // Compass: North(top), East(right), South(bottom), West(left).
+    // Anticlockwise rotation: North(2)→West(1)→South(0)→East(3)→North(2)
     ccwNext(i) { return (i + 3) % 4; },
 
     // Team index for a player (0 = South+North, 1 = West+East)
@@ -1696,6 +1698,34 @@ const TekkaRules = {
         return order;
     },
 
+    // Cut a card for each of the 4 players to decide initial last bidder (dealer)
+    cutForInitialDealer() {
+        const deck = new Deck();
+        deck.shuffle();
+        const cards = [deck.draw(), deck.draw(), deck.draw(), deck.draw()];
+        const suitRank = { 'spades': 4, 'hearts': 3, 'diamonds': 2, 'clubs': 1 };
+        let highestSeat = 0;
+        let highestVal = -1;
+        let highestSuit = -1;
+
+        for (let i = 0; i < 4; i++) {
+            const c = cards[i];
+            const v = c.value;
+            const s = suitRank[c.suit] || 0;
+            if (v > highestVal || (v === highestVal && s > highestSuit)) {
+                highestVal = v;
+                highestSuit = s;
+                highestSeat = i;
+            }
+        }
+
+        return {
+            cards,
+            lastBidder: highestSeat,
+            firstBidder: this.ccwNext(highestSeat)
+        };
+    },
+
     // Returns numeric rank of bid for comparison
     bidValue(b) {
         if (b === null || b === undefined || b === BID.PASS || b === 'pass' || b === BID.TEER || b === 'teer') return 0;
@@ -1714,10 +1744,22 @@ const TekkaRules = {
     },
 
     // Legal bid amounts given the current highest bid
-    legalBids(currentHighBid) {
+    // When isLastBidderWithAllPass is true, the last bidder MUST bid at least 8 or higher
+    legalBids(currentHighBid, isLastBidderWithAllPass = false) {
         const legal = [];
-        for (let n = MIN_BID; n <= MAX_BID; n++) {
-            if (this.isHigherBid(n, currentHighBid)) legal.push(n);
+        if (isLastBidderWithAllPass) {
+            for (let n = FORCED_MIN_BID; n <= MAX_BID; n++) {
+                legal.push(n);
+            }
+            legal.push(BID.LARIES);
+            legal.push(BID.BAWAND);
+            return legal;
+        }
+
+        const currentVal = this.bidValue(currentHighBid);
+        const start = currentVal > 0 ? (currentVal + 1) : MIN_BID;
+        for (let n = start; n <= MAX_BID; n++) {
+            legal.push(n);
         }
         if (this.isHigherBid(BID.LARIES, currentHighBid)) legal.push(BID.LARIES);
         if (this.isHigherBid(BID.BAWAND, currentHighBid)) legal.push(BID.BAWAND);
@@ -1909,18 +1951,26 @@ class TekkaAI {
         }
 
         const currentHighVal = TekkaRules.bidValue(currentHighBid);
+        const isAllPassBeforeMe = (currentHighVal === 0);
+        const isLastBidderWithAllPass = (biddingPosition === 3 && isAllPassBeforeMe);
 
-        // Can we make a legal bid higher than currentHighBid?
-        if (totalExpected >= MIN_BID && totalExpected > currentHighVal) {
-            const targetBid = Math.min(MAX_BID, totalExpected);
-            // Ensure bid is higher than current
-            const bidToMake = Math.max(currentHighVal + 1, targetBid);
+        // Rule: If everyone before the last bidder passed/teered, the last bidder MUST bid at least 8 or higher
+        if (isLastBidderWithAllPass) {
+            const forcedTarget = Math.max(8, Math.min(MAX_BID, totalExpected));
+            return forcedTarget;
+        }
+
+        // Regular voluntary bidding: opening bid must be 9 or higher
+        const minNeeded = isAllPassBeforeMe ? 9 : (currentHighVal + 1);
+
+        if (totalExpected >= minNeeded && totalExpected <= MAX_BID) {
+            const bidToMake = Math.max(minNeeded, totalExpected);
             if (bidToMake <= Math.min(MAX_BID, totalExpected + 1)) {
                 return Math.min(MAX_BID, bidToMake);
             }
         }
 
-        // Cannot make a higher bid or hand is too weak (< 8 tricks total).
+        // Cannot make a higher bid or hand is too weak (< 9 tricks for voluntary opening).
         // Choose between Pass and Teer:
         // Pass: "ik zou je kunnen helpen met tricks pakken" (1-3 tricks, ownTricks >= 1.5)
         // Teer: "ik zou niet of bijna niet kunnen helpen met tricks pakken" (0-1 trick, ownTricks < 1.5)
@@ -2302,7 +2352,11 @@ class TekkaGame {
     reset() {
         this.phase = PHASE.IDLE;
         this.hands = [[], [], [], []];       // [South, West, North, East]
-        this.dealer = SEAT.SOUTH;            // South deals first
+
+        // Cut cards to determine initial last bidder (dealer) at start of 104-pt match
+        this.cutResult = TekkaRules.cutForInitialDealer();
+        this.dealer = this.cutResult.lastBidder;
+        this.lastBidder = this.dealer;
 
         // Bidding
         this.biddingOrder = [];              // Order of seats for this round's bidding
@@ -2464,6 +2518,21 @@ class TekkaGame {
         const isBawand = (bid === BID.BAWAND || bid === 'bawand');
         const isLaries = (bid === BID.LARIES || bid === 'laries' || bid === 'double13' || bid === BID.DOUBLE13);
         const cleanBid = isPass ? BID.PASS : isTeer ? BID.TEER : isBawand ? BID.BAWAND : isLaries ? BID.LARIES : Number(bid);
+
+        const isLastBidderWithAllPass = (this.biddingStep === 3 && this.highBid === null);
+
+        // If last bidder when all previous passed, Pass and Teer are forbidden (must bid at least 8)
+        if (isLastBidderWithAllPass && (isPass || isTeer)) {
+            return { error: 'Last bidder must bid at least 8 when all previous players have passed' };
+        }
+
+        // Opening voluntary bid must be at least 9
+        if (!isPass && !isTeer && this.highBid === null && !isLastBidderWithAllPass) {
+            const val = TekkaRules.bidValue(cleanBid);
+            if (val < 9) {
+                return { error: 'Opening bid must be 9 or higher' };
+            }
+        }
 
         if (cleanBid !== BID.PASS && cleanBid !== BID.TEER && !TekkaRules.isHigherBid(cleanBid, this.highBid)) {
             return { error: 'Bid must be higher than current bid' };
@@ -2695,8 +2764,10 @@ class TekkaGame {
             this.phase = PHASE.GAME_OVER;
         }
 
-        // Rotate dealer (CCW)
-        this.dealer = TekkaRules.ccwNext(this.dealer);
+        // Dealer rotation rule: winner of the hand remains/becomes the last bidder (dealer).
+        // If the current dealer's team loses, the dealer rotates CCW to the next player.
+        const roundWinnerTeam = roundResult.made ? this.declarantTeam : (1 - this.declarantTeam);
+        this._updateDealerForNextRound(roundWinnerTeam);
 
         return {
             ...trickResult,
@@ -2706,6 +2777,20 @@ class TekkaGame {
             gameOver,
             gameWinner: gameOver ? (this.teamScores[0] >= TARGET_SCORE ? 0 : 1) : null
         };
+    }
+
+    _updateDealerForNextRound(roundWinnerTeam) {
+        const currentDealer = (this.dealer !== null && this.dealer !== undefined) ? this.dealer : SEAT.SOUTH;
+        const currentDealerTeam = TekkaRules.teamOf(currentDealer);
+
+        if (roundWinnerTeam === currentDealerTeam) {
+            // Last bidder's team won -> keeps last bidder role!
+            this.dealer = currentDealer;
+        } else {
+            // Last bidder's team lost -> rotate to next in CCW
+            this.dealer = TekkaRules.ccwNext(currentDealer);
+        }
+        this.lastBidder = this.dealer;
     }
 
     // Mid-game bid raise rejected by defenders -> defenders concede the original bid.
@@ -2745,7 +2830,9 @@ class TekkaGame {
         this.phase = PHASE.ROUND_END;
         const gameOver = this.teamScores[0] >= TARGET_SCORE || this.teamScores[1] >= TARGET_SCORE;
         if (gameOver) this.phase = PHASE.GAME_OVER;
-        this.dealer = TekkaRules.ccwNext(this.dealer);
+
+        // In concedeOriginalBid, declarant team won
+        this._updateDealerForNextRound(this.declarantTeam);
 
         return {
             ok: true,
@@ -2807,7 +2894,8 @@ class TekkaGame {
     }
 
     getLegalBids() {
-        return TekkaRules.legalBids(this.highBid);
+        const isLastBidderWithAllPass = (this.biddingStep === 3 && this.highBid === null);
+        return TekkaRules.legalBids(this.highBid, isLastBidderWithAllPass);
     }
 
     // Serialize game state for network transmission
@@ -2815,6 +2903,8 @@ class TekkaGame {
         return {
             phase: this.phase,
             dealer: this.dealer,
+            lastBidder: this.dealer,
+            cutResult: this.cutResult,
             bids: this.bids,
             highBid: this.highBid,
             highBidder: this.highBidder,
@@ -3035,6 +3125,8 @@ class TekkaNetwork {
             from: this.mySeatIndex,
             hands: gameState.hands.map(h => h.map(c => ({ suit: c.suit, rank: c.rank }))),
             dealer: gameState.dealer,
+            lastBidder: gameState.dealer,
+            cutResult: gameState.cutResult,
             biddingOrder: gameState.biddingOrder,
             playerSeats: playerSeats || gameState.players,
             teamScores: gameState.teamScores,
@@ -3522,7 +3614,21 @@ class TekkaUI {
         this.game.shuffleOnDeal = true;
         this.onlineMode = false;
         this._showScreen('screen-game');
+        if (this.game.cutResult) {
+            this._showCutCardNotification(this.game.cutResult);
+        }
         this._dealNewHand();
+    }
+
+    _showCutCardNotification(cut) {
+        if (!cut || !cut.cards) return;
+        const lastSeat = cut.lastBidder;
+        const lastName = this.game.players[lastSeat]?.name || 'Player';
+        const firstName = this.game.players[cut.firstBidder]?.name || 'Player';
+        const lastCard = cut.cards[lastSeat];
+        const suitSymbol = SUIT_SYMBOLS[lastCard.suit] || lastCard.suit;
+        const cardStr = `${lastCard.rank}${suitSymbol}`;
+        this.showToast(`🃏 Cut: ${lastName} drew ${cardStr} (Highest)! ${lastName} bids LAST, ${firstName} bids FIRST.`, 4500);
     }
 
     _dealNewHand() {
@@ -3746,12 +3852,24 @@ class TekkaUI {
         const isMyTurn = this.onlineMode ? (bidder === mySeat) : this.game.players[bidder].isHuman;
         const isBotTurn = this.onlineMode ? (this.net.isHost && this.game.players[bidder].isBot) : (!this.game.players[bidder].isHuman);
 
+        const isLastBidderWithAllPass = (this.game.biddingStep === 3 && this.game.highBid === null);
+
         if (this.elBidStatus) {
             if (isMyTurn) {
-                this.elBidStatus.textContent = `Your turn to bid! Current high: ${this._formatBid(this.game.highBid)}`;
+                if (isLastBidderWithAllPass) {
+                    this.elBidStatus.textContent = 'Everyone passed! You are the last bidder and must bid at least 8.';
+                } else if (this.game.highBid === null) {
+                    this.elBidStatus.textContent = 'Your turn! Choose an opening bid of 9 or higher, or Pass/Teer.';
+                } else {
+                    this.elBidStatus.textContent = `Your turn to bid! Current high: ${this._formatBid(this.game.highBid)}`;
+                }
                 this.elBidStatus.style.color = 'var(--gold-light)';
             } else {
-                this.elBidStatus.textContent = `Waiting for ${name} to bid... (High: ${this._formatBid(this.game.highBid)})`;
+                if (isLastBidderWithAllPass) {
+                    this.elBidStatus.textContent = `Everyone passed. Waiting for ${name} (last bidder, must bid ≥8)...`;
+                } else {
+                    this.elBidStatus.textContent = `Waiting for ${name} to bid... (High: ${this._formatBid(this.game.highBid)})`;
+                }
                 this.elBidStatus.style.color = 'var(--text-light)';
             }
         }
@@ -4465,18 +4583,38 @@ class TekkaUI {
         const pts = rr ? (made ? (rr.declarantPoints || 0) : (rr.defenderPoints || 0)) : 0;
         const tricks = rr ? (rr.tricksTaken !== undefined ? rr.tricksTaken : 0) : 0;
 
+        const mySeat = this._getMySeat();
+        const myTeam = TekkaRules.teamOf(mySeat);
+        const isMyTeamDeclarant = (this.game.declarantTeam === myTeam);
+        // Did user's team win the round points?
+        const didMyTeamWin = isMyTeamDeclarant ? made : !made;
+
         const titleEl = document.getElementById('round-result-title');
         if (titleEl) {
-            titleEl.textContent = made ? `✅ Bid Made!` : `❌ Bid Failed!`;
+            titleEl.className = 'round-result-title ' + (didMyTeamWin ? 'made' : 'failed');
+            if (didMyTeamWin) {
+                if (isMyTeamDeclarant) {
+                    titleEl.textContent = `🎉 Bid Made! (+${pts} pts)`;
+                } else {
+                    titleEl.textContent = `🎉 You Won! Opponent Failed Bid (+${pts} pts)`;
+                }
+            } else {
+                if (isMyTeamDeclarant) {
+                    titleEl.textContent = `❌ Bid Failed! (Opponents +${pts} pts)`;
+                } else {
+                    titleEl.textContent = `❌ Opponents Made Bid! (+${pts} pts)`;
+                }
+            }
         }
 
         const detailEl = document.getElementById('round-result-detail');
         if (detailEl) {
+            const scoringTeamName = didMyTeamWin ? 'Your team' : 'Opponents';
+            const color = didMyTeamWin ? '#4ade80' : '#f87171';
             detailEl.innerHTML =
                 `${declarantName} bid <strong>${bidLabel}</strong> for Team ${teamLabel}<br>` +
                 `Hands taken: <strong>${tricks}/13</strong><br>` +
-                (made ? `Team ${teamLabel} scores <strong>+${pts}</strong> pts`
-                      : `Opponents score <strong>+${pts}</strong> pts`);
+                `<span style="color:${color};font-weight:800;font-size:1.05rem;">${scoringTeamName} score +${pts} pts!</span>`;
         }
 
         const scoresEl = document.getElementById('round-scores');
@@ -4719,6 +4857,11 @@ class TekkaUI {
             this.game.phase = PHASE.BIDDING;
             this.game.hands = data.hands.map(h => deserializeHand(h));
             this.game.dealer = Number(data.dealer);
+            this.game.lastBidder = this.game.dealer;
+            if (data.cutResult) {
+                this.game.cutResult = data.cutResult;
+                this._showCutCardNotification(data.cutResult);
+            }
             this.game.biddingOrder = (data.biddingOrder || []).map(Number);
             this.game.biddingStep = 0;
             this.game.activePlayer = this.game.biddingOrder[0];
@@ -4924,8 +5067,12 @@ class TekkaUI {
         deck.shuffle();
         const hands = deck.deal(4);
         this.game.hands = hands;
-        this.game.dealer = SEAT.SOUTH;
-        this.game.biddingOrder = TekkaRules.biddingOrder(SEAT.SOUTH);
+        // Host cuts for initial dealer at start of 104-pt match
+        const cut = TekkaRules.cutForInitialDealer();
+        this.game.cutResult = cut;
+        this.game.dealer = cut.lastBidder;
+        this.game.lastBidder = cut.lastBidder;
+        this.game.biddingOrder = TekkaRules.biddingOrder(this.game.dealer);
         this.game.biddingStep = 0;
         this.game.phase = PHASE.BIDDING;
         this.game.activePlayer = this.game.biddingOrder[0];
@@ -4941,6 +5088,7 @@ class TekkaUI {
 
         this._closeModal('modal-online');
         this._showScreen('screen-game');
+        this._showCutCardNotification(cut);
         this._resetBoard();
         this._renderAllHands();
         this._updateScoreDisplay();
