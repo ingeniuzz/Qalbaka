@@ -1218,14 +1218,14 @@ html, body {
         </div>
         <div class="modal-body" style="text-align:center;">
             <p style="font-size:1.05rem; margin-bottom:0.75rem;">
-                Wil je deze hand opgeven (Surrender)?
+                Surrender this hand?
             </p>
-            <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:1.5rem; line-height:1.4;">
-                De tegenstanders winnen direct hun contract van <strong id="lbl-surrender-contract" style="color:var(--gold-light);">9</strong> hands (+<span id="lbl-surrender-pts">9</span> ptn). Je partner moet akkoord gaan. De volgende hand start daarna direct.
+            <p id="lbl-surrender-msg" style="font-size:0.88rem; color:var(--text-muted); margin-bottom:1.5rem; line-height:1.5;">
+                Opponents will win the contract. Your partner must agree. The next hand will start immediately.
             </p>
             <div style="display:flex; flex-direction:column; gap:8px;">
-                <button id="btn-confirm-surrender" class="btn-primary" style="background:#dc2626; border-color:#b91c1c;">🏳️ Ja, Geef Hand Op</button>
-                <button class="btn-secondary" data-close="modal-surrender">Annuleren (Verder spelen)</button>
+                <button id="btn-confirm-surrender" class="btn-primary" style="background:#dc2626; border-color:#b91c1c;">🏳️ Yes, Surrender</button>
+                <button class="btn-secondary" data-close="modal-surrender">Cancel (Keep Playing)</button>
             </div>
         </div>
     </div>
@@ -1235,15 +1235,15 @@ html, body {
 <div id="modal-partner-surrender" class="modal-backdrop hidden">
     <div class="modal-dialog">
         <div class="modal-header">
-            <span class="modal-title">🏳️ Partner stelt Surrender voor</span>
+            <span class="modal-title">🏳️ Partner Proposes Surrender</span>
         </div>
         <div class="modal-body" style="text-align:center;">
             <p id="lbl-partner-surrender-text" style="font-size:0.95rem; margin-bottom:1.5rem; line-height:1.5;">
-                Je partner stelt voor om deze hand op te geven (Surrender).<br>Ga je akkoord met het toekennen van het contract aan de tegenstanders?
+                Your partner proposes to surrender this hand.<br>Do you agree to concede to opponents?
             </p>
             <div style="display:flex; flex-direction:column; gap:8px;">
-                <button id="btn-partner-surrender-agree" class="btn-primary" style="background:#dc2626; border-color:#b91c1c;">✓ Akkoord (Geef Op)</button>
-                <button id="btn-partner-surrender-decline" class="btn-secondary">✕ Weigeren (Speel Door)</button>
+                <button id="btn-partner-surrender-agree" class="btn-primary" style="background:#dc2626; border-color:#b91c1c;">✓ Agree (Surrender)</button>
+                <button id="btn-partner-surrender-decline" class="btn-secondary">✕ Decline (Keep Playing)</button>
             </div>
         </div>
     </div>
@@ -1382,6 +1382,16 @@ html, body {
                     <option value="medium">Intermediate</option>
                     <option value="hard" selected>Expert</option>
                 </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Deal & Cut Mode</label>
+                <select id="setting-deal-mode" class="form-control">
+                    <option value="classic" selected>Classic Cut (Authentic — Trick Stacking & 2 Cuts)</option>
+                    <option value="random">Random Cut (Full Random Shuffle Every Hand)</option>
+                </select>
+                <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">
+                    In Classic Cut, tricks won by each team are stacked, cut twice, and dealt in 13-card packets just like in authentic Tekka.
+                </div>
             </div>
         </div>
         <div class="modal-footer">
@@ -1992,13 +2002,13 @@ class TekkaAI {
 
         // Calculate partner support based on user rules:
         // - Teer: partner has 0-1 trick -> count ~0.5
-        // - Pass: partner has 1-3 tricks (usually 1-2) -> count ~1.5
-        // - Unknown (not yet bid): partner should be counted on for at least 1 trick -> count 1.0
-        let partnerSupport = 1.0;
+        // - Pass: partner has 1-3 tricks (usually 1-2) -> count ~1.75
+        // - Unknown (not yet bid): partner should be counted on for at least 1-2 tricks -> count ~1.5
+        let partnerSupport = 1.5;
         if (partnerBid === BID.TEER || partnerBid === 'teer') {
             partnerSupport = 0.5;
         } else if (partnerBid === BID.PASS || partnerBid === 'pass') {
-            partnerSupport = 1.5;
+            partnerSupport = 1.75;
         } else if (partnerBid !== null && partnerBid !== undefined) {
             // Partner made a numeric bid or special contract
             const partnerVal = TekkaRules.bidValue(partnerBid);
@@ -2011,7 +2021,7 @@ class TekkaAI {
                         return BID.LARIES;
                     }
                 }
-                partnerSupport = Math.max(1.0, partnerVal - 7);
+                partnerSupport = Math.max(1.5, partnerVal - 7);
             }
         }
 
@@ -2082,6 +2092,8 @@ class TekkaAI {
     static _estimateTricksForSuit(trumpCandidate, suitLengths, hand) {
         const trumpCards = hand.filter(c => c.suit === trumpCandidate);
         const trumpLen = trumpCards.length;
+        if (trumpLen < 3) return 0; // Not a viable trump suit
+
         let tricks = 0;
 
         // Trump honors
@@ -2089,16 +2101,22 @@ class TekkaAI {
         const hasK = trumpCards.some(c => c.value === 13);
         const hasQ = trumpCards.some(c => c.value === 12);
         const hasJ = trumpCards.some(c => c.value === 11);
+        const has10 = trumpCards.some(c => c.value === 10);
 
-        if (hasA) tricks += 1.0;
-        if (hasK) tricks += (hasA ? 1.0 : 0.8);
-        if (hasQ) tricks += ((hasA && hasK) ? 0.9 : 0.5);
-        if (hasJ && trumpLen >= 4) tricks += 0.4;
-
-        // Trump length power: length cards beyond 4 generate tricks
-        if (trumpLen === 5) tricks += 1.0;
-        else if (trumpLen === 6) tricks += 2.2;
-        else if (trumpLen >= 7) tricks += 3.5 + (trumpLen - 7) * 1.0;
+        // Trump length & power:
+        // In Tekka (Rang), long trump suits dictate the game and reliably yield tricks.
+        // E.g. 6 trump cards with honors = ~6 tricks!
+        if (trumpLen === 3) {
+            tricks += (hasA ? 1.5 : (hasK ? 1.0 : 0.5));
+        } else if (trumpLen === 4) {
+            tricks += 2.5 + (hasA ? 1.0 : 0) + (hasK ? 0.7 : 0);
+        } else if (trumpLen === 5) {
+            tricks += 3.5 + (hasA ? 1.0 : 0) + (hasK ? 0.8 : 0) + (hasQ ? 0.5 : 0);
+        } else if (trumpLen === 6) {
+            tricks += 5.0 + (hasA ? 0.7 : 0) + (hasK ? 0.6 : 0) + (hasQ ? 0.4 : 0);
+        } else if (trumpLen >= 7) {
+            tricks += 6.5 + (trumpLen - 7) * 1.0 + (hasA ? 0.5 : 0);
+        }
 
         // Outside suits (Aces, protected Kings, ruffing power)
         for (const suit of SUITS) {
@@ -2110,13 +2128,17 @@ class TekkaAI {
             const sQ = sideCards.some(c => c.value === 12);
 
             if (sA) tricks += 1.0;
-            if (sK && sideLen >= 2) tricks += (sA ? 0.9 : 0.7);
-            if (sQ && sideLen >= 3 && sK) tricks += 0.5;
+            if (sK) {
+                if (sA) tricks += 1.0;
+                else if (sideLen >= 2) tricks += 0.8;
+                else tricks += 0.5;
+            }
+            if (sQ && sideLen >= 3 && (sA || sK)) tricks += 0.5;
 
             // Ruffing potential if we have solid trumps (>= 4)
             if (trumpLen >= 4) {
-                if (sideLen === 0) tricks += 1.0; // Void in side suit
-                else if (sideLen === 1 && !sA) tricks += 0.5; // Singleton
+                if (sideLen === 0) tricks += 1.5; // Void in side suit
+                else if (sideLen === 1 && !sA && !sK) tricks += 0.8; // Singleton
             }
         }
 
@@ -2567,6 +2589,11 @@ class TekkaGame {
             { name: 'East Bot', isHuman: false, isBot: true }
         ];
         this.difficulty = 'hard';
+        this.dealMode = 'classic';          // 'classic' (Traditional trick stacking & 2 cuts) | 'random' (Full shuffle)
+        this.trickPiles = { 0: [], 1: [] }; // Cards collected by each team in order
+        this.stackedDeck = null;            // 52-card deck assembled from previous round
+        this.lastRoundWinnerTeam = null;    // Winner of last round who cuts first
+        this.lastCutInfo = null;            // Metadata of latest cuts
         this.shuffleOnDeal = true;          // Only shuffle on very first deal
         this.handNumber = 0;
         this.isOnline = false;
@@ -2579,15 +2606,68 @@ class TekkaGame {
         this.handNumber++;
         this.phase = PHASE.DEALING;
 
-        const deck = new Deck();
-        deck.shuffle(); // Always shuffle every hand
+        if (opts.dealMode) this.dealMode = opts.dealMode;
 
-        // Deal counter-clockwise starting from seat after dealer
-        const rawHands = deck.deal(4);
-        // The raw deal goes in order 0,1,2,3; for CCW from after dealer we reindex
-        // For simplicity, deal to seats in order starting from dealer+CCW
-        // This just assigns hands randomly which is fine
-        this.hands = rawHands;
+        // Set up bidding order CCW starting from seat after dealer
+        this.biddingOrder = TekkaRules.biddingOrder(this.dealer);
+        this.biddingStep = 0;
+
+        let deckCards = null;
+        this.lastCutInfo = null;
+
+        const isClassic = (this.dealMode === 'classic' && this.stackedDeck && this.stackedDeck.length === 52);
+
+        if (isClassic) {
+            // Authentic Tekka Classic Cut:
+            // Two cuts in 2 portions:
+            // 1. Round winner cuts: top K1 cards move to bottom
+            const winTeam = (this.lastRoundWinnerTeam !== null && this.lastRoundWinnerTeam !== undefined)
+                ? this.lastRoundWinnerTeam : 0;
+            const oppTeam = 1 - winTeam;
+
+            // Cut 1 (by winning team): slice top K1 cards and move to bottom
+            const k1 = Math.floor(Math.random() * 33) + 10; // Between 10 and 42 cards
+            let cutDeck = this.stackedDeck.slice(k1).concat(this.stackedDeck.slice(0, k1));
+
+            // Cut 2 (by opponent team): slice top K2 cards and move to bottom
+            const k2 = Math.floor(Math.random() * 33) + 10; // Between 10 and 42 cards
+            cutDeck = cutDeck.slice(k2).concat(cutDeck.slice(0, k2));
+
+            deckCards = cutDeck;
+
+            this.lastCutInfo = {
+                mode: 'classic',
+                winnerTeam: winTeam,
+                opponentTeam: oppTeam,
+                cut1: k1,
+                cut2: k2
+            };
+
+            // Packet deal: 13 cards per player in bidding order.
+            // "13 voor 1 persoon (39 over), dan van die 39 kaarten 13 naar de ander etc. de laatste bidder krijgt de resterende 13 kaarten."
+            // biddingOrder[0] gets cards 0..12
+            // biddingOrder[1] gets cards 13..25
+            // biddingOrder[2] gets cards 26..38
+            // biddingOrder[3] (the dealer / last bidder) gets cards 39..51
+            this.hands = [[], [], [], []];
+            for (let i = 0; i < 4; i++) {
+                const targetSeat = this.biddingOrder[i];
+                const packet = deckCards.slice(i * 13, (i + 1) * 13);
+                this.hands[targetSeat] = TekkaRules.sortHand(packet.map(c => new Card(c.suit, c.rank)));
+            }
+        } else {
+            // Random Cut / Fresh full shuffle:
+            const deck = new Deck();
+            deck.shuffle();
+            const rawHands = deck.deal(4);
+            this.hands = rawHands.map(h => TekkaRules.sortHand(h));
+            this.lastCutInfo = {
+                mode: 'random'
+            };
+        }
+
+        // Reset trick piles for the new round
+        this.trickPiles = { 0: [], 1: [] };
 
         // Reset per-hand state
         this.bids = [null, null, null, null];
@@ -2615,10 +2695,6 @@ class TekkaGame {
         };
         this.voidSuits = { 0: [], 1: [], 2: [], 3: [] };
         this.allPlayedCards = [];
-
-        // Set up bidding order
-        this.biddingOrder = TekkaRules.biddingOrder(this.dealer);
-        this.biddingStep = 0;
 
         this.phase = PHASE.BIDDING;
         this.activePlayer = this.biddingOrder[0];
@@ -2862,6 +2938,14 @@ class TekkaGame {
         this.teamTricks[winnerTeam]++;
         this.completedTricks.push({ cards: [...this.currentTrick], winner, trickNumber: this.trickNumber });
 
+        // Authentic Tekka rule: Store won trick cards in winner team's pile in order played
+        if (!this.trickPiles) this.trickPiles = { 0: [], 1: [] };
+        for (const entry of this.currentTrick) {
+            if (entry && entry.card) {
+                this.trickPiles[winnerTeam].push(entry.card);
+            }
+        }
+
         const result = {
             ok: true,
             trickComplete: true,
@@ -2952,6 +3036,7 @@ class TekkaGame {
         // If the current dealer's team loses, the dealer rotates CCW to the next player.
         const roundWinnerTeam = roundResult.made ? this.declarantTeam : (1 - this.declarantTeam);
         this._updateDealerForNextRound(roundWinnerTeam);
+        this._finalizeRoundDeck(roundWinnerTeam);
 
         return {
             ...trickResult,
@@ -2975,6 +3060,41 @@ class TekkaGame {
             this.dealer = TekkaRules.ccwNext(currentDealer);
         }
         this.lastBidder = this.dealer;
+    }
+
+    _finalizeRoundDeck(roundWinnerTeam) {
+        if (!this.trickPiles) this.trickPiles = { 0: [], 1: [] };
+
+        // Collect any unplayed cards in players' hands (if conceded/surrendered early)
+        const unplayedCards = [];
+        for (let s = 0; s < 4; s++) {
+            if (this.hands[s] && this.hands[s].length > 0) {
+                unplayedCards.push(...this.hands[s]);
+            }
+        }
+        if (this.currentTrick && this.currentTrick.length > 0) {
+            for (const entry of this.currentTrick) {
+                if (entry && entry.card) unplayedCards.push(entry.card);
+            }
+        }
+
+        const winTeam = (roundWinnerTeam !== undefined && roundWinnerTeam !== null) ? roundWinnerTeam : 0;
+        const loseTeam = 1 - winTeam;
+
+        // User's authentic rule: Stack winner's trick pile and opponent's trick pile together:
+        // "aan het einde van de hand zet je mijn stapel en de tegenstanders stapel op elkaar."
+        const stacked = [
+            ...this.trickPiles[winTeam],
+            ...this.trickPiles[loseTeam],
+            ...unplayedCards
+        ];
+
+        if (stacked.length === 52) {
+            this.stackedDeck = stacked;
+            this.lastRoundWinnerTeam = winTeam;
+        } else {
+            this.stackedDeck = null;
+        }
     }
 
     // Mid-game bid raise rejected by defenders -> defenders concede the original bid.
@@ -3017,6 +3137,7 @@ class TekkaGame {
 
         // In concedeOriginalBid, declarant team won
         this._updateDealerForNextRound(this.declarantTeam);
+        this._finalizeRoundDeck(this.declarantTeam);
 
         return {
             ok: true,
@@ -3032,12 +3153,68 @@ class TekkaGame {
     }
 
     surrenderHand(surrenderingTeam) {
-        const res = this.concedeOriginalBid();
-        if (res && res.roundResult) {
-            res.roundResult.surrendered = true;
-            res.roundResult.surrenderingTeam = surrenderingTeam;
+        const isDeclarantSurrender = (Number(surrenderingTeam) === Number(this.declarantTeam));
+        if (isDeclarantSurrender) {
+            // Declarant surrenders -> Contract fails! Defenders win double points (or 8 for forced 8)
+            const defTeam = 1 - this.declarantTeam;
+            let defPts = 0;
+            if (this.contractType === BID.BAWAND) {
+                defPts = 52;
+            } else if (this.contractType === BID.LARIES || this.contractType === 'double13') {
+                defPts = 26;
+            } else {
+                const contractNum = Number(this.contractAmount) || 8;
+                if (this.forcedEight && contractNum === 8) {
+                    defPts = 8;
+                } else {
+                    defPts = contractNum * 2;
+                }
+            }
+            this.teamScores[defTeam] += defPts;
+            const roundResult = {
+                made: false,
+                surrendered: true,
+                surrenderingTeam,
+                declarantTeam: this.declarantTeam,
+                declarantPoints: 0,
+                defenderPoints: defPts,
+                tricksTaken: this.teamTricks[this.declarantTeam]
+            };
+            this.roundHistory.push({
+                handNumber: this.handNumber,
+                dealer: this.dealer,
+                declarant: this.highBidder,
+                declarantTeam: this.declarantTeam,
+                contract: this.contractAmount,
+                contractType: this.contractType,
+                tricksTaken: this.teamTricks[this.declarantTeam],
+                made: false,
+                teamScores: [...this.teamScores]
+            });
+            this.phase = PHASE.ROUND_END;
+            const gameOver = this.teamScores[0] >= TARGET_SCORE || this.teamScores[1] >= TARGET_SCORE;
+            if (gameOver) this.phase = PHASE.GAME_OVER;
+
+            // Winner of round is defenders
+            this._updateDealerForNextRound(defTeam);
+            this._finalizeRoundDeck(defTeam);
+
+            return {
+                ok: true,
+                roundEnd: true,
+                gameOver,
+                winner: gameOver ? (this.teamScores[0] >= TARGET_SCORE ? 0 : 1) : null,
+                roundResult
+            };
+        } else {
+            // Defender surrenders -> Declarant wins original contract points
+            const res = this.concedeOriginalBid();
+            if (res && res.roundResult) {
+                res.roundResult.surrendered = true;
+                res.roundResult.surrenderingTeam = surrenderingTeam;
+            }
+            return res;
         }
-        return res;
     }
 
     // Mid-game bid raise accepted by defenders -> update contract target
@@ -3116,6 +3293,8 @@ class TekkaGame {
             biddingOrder: this.biddingOrder,
             announcements: this.announcements,
             voidSuits: this.voidSuits,
+            dealMode: this.dealMode,
+            lastCutInfo: this.lastCutInfo,
             handCounts: this.hands.map(h => h.length)
         };
     }
@@ -3321,6 +3500,8 @@ class TekkaNetwork {
             dealer: gameState.dealer,
             lastBidder: gameState.dealer,
             cutResult: gameState.cutResult,
+            lastCutInfo: gameState.lastCutInfo,
+            dealMode: gameState.dealMode,
             biddingOrder: gameState.biddingOrder,
             playerSeats: playerSeats || gameState.players,
             teamScores: gameState.teamScores,
@@ -3512,6 +3693,8 @@ class TekkaNetwork {
                         biddingOrder: (msg.biddingOrder || []).map(Number),
                         playerSeats: msg.playerSeats,
                         teamScores: msg.teamScores,
+                        lastCutInfo: msg.lastCutInfo,
+                        dealMode: msg.dealMode,
                         handNumber: msg.handNumber
                     });
                 }
@@ -3809,6 +3992,21 @@ class TekkaUI {
             this.game.difficulty = e.target.value;
         });
 
+        // Deal & Cut Mode setting (Classic Cut vs Random Cut)
+        this.dealMode = localStorage.getItem('tekka-deal-mode') || 'classic';
+        this.game.dealMode = this.dealMode;
+        const dealModeEl = document.getElementById('setting-deal-mode');
+        if (dealModeEl) {
+            dealModeEl.value = this.dealMode;
+            dealModeEl.addEventListener('change', (e) => {
+                this.dealMode = e.target.value;
+                this.game.dealMode = this.dealMode;
+                localStorage.setItem('tekka-deal-mode', this.dealMode);
+                const modeName = this.dealMode === 'classic' ? 'Classic Cut (Authentic)' : 'Random Cut';
+                this.showToast(`⚙ Deal mode set to: ${modeName}`, 3000);
+            });
+        }
+
         // Play Again button in game-over modal
         document.getElementById('btn-play-again')?.addEventListener('click', () => {
             this._closeModal('modal-game-over');
@@ -3893,12 +4091,17 @@ class TekkaUI {
     }
 
     _dealNewHand() {
-        this.game.deal();
+        this.game.deal({ dealMode: this.dealMode });
         this._resetBoard();
         this._renderAllHands();
         this._updateScoreDisplay();
         this._updateTrumpDisplay();
         this._hideBidOverlay();
+        if (this.game.lastCutInfo && this.game.lastCutInfo.mode === 'classic') {
+            const winTeamLabel = this.game.lastCutInfo.winnerTeam === 0 ? 'Team N/S' : 'Team W/E';
+            const oppTeamLabel = this.game.lastCutInfo.opponentTeam === 0 ? 'Team N/S' : 'Team W/E';
+            this.showToast(`✂️ Classic Cut: ${winTeamLabel} cut ${this.game.lastCutInfo.cut1} cards to bottom, ${oppTeamLabel} cut ${this.game.lastCutInfo.cut2} cards. Dealt 13-card packets!`, 4500);
+        }
         this._startBidding();
     }
 
@@ -3933,7 +4136,7 @@ class TekkaUI {
     }
 
     _startNextOnlineRound() {
-        this.game.deal();
+        this.game.deal({ dealMode: this.dealMode });
         if (this.lobbySeats && this.lobbySeats.length > 0) {
             this.lobbySeats.forEach(s => {
                 const idx = Number(s.seatIndex);
@@ -3950,6 +4153,11 @@ class TekkaUI {
         this._updateScoreDisplay();
         this._updateTrumpDisplay();
         this._updatePlayerBadges();
+        if (this.game.lastCutInfo && this.game.lastCutInfo.mode === 'classic') {
+            const winTeamLabel = this.game.lastCutInfo.winnerTeam === 0 ? 'Team N/S' : 'Team W/E';
+            const oppTeamLabel = this.game.lastCutInfo.opponentTeam === 0 ? 'Team N/S' : 'Team W/E';
+            this.showToast(`✂️ Classic Cut: ${winTeamLabel} cut ${this.game.lastCutInfo.cut1} cards to bottom, ${oppTeamLabel} cut ${this.game.lastCutInfo.cut2} cards. Dealt 13-card packets!`, 4500);
+        }
         this._startBidding();
     }
 
@@ -4466,28 +4674,39 @@ class TekkaUI {
 
     _updateSurrenderButton() {
         if (!this.elBtnSurrender) return;
-        const mySeat = this._getMySeat();
-        const myTeam = TekkaRules.teamOf(mySeat);
-        const canSurrender = (
-            this.game.phase === PHASE.PLAYING &&
-            this.game.declarantTeam !== null &&
-            this.game.declarantTeam !== myTeam
-        );
+        const canSurrender = (this.game.phase === PHASE.PLAYING);
         this.elBtnSurrender.classList.toggle('hidden', !canSurrender);
     }
 
     _openSurrenderModal() {
+        const mySeat = this._getMySeat();
+        const myTeam = TekkaRules.teamOf(mySeat);
+        const isDeclarant = (myTeam === this.game.declarantTeam);
         const contract = this.game.highBid || this.game.contractAmount || 9;
         const contractStr = this._formatBid(contract);
-        let pts = 0;
-        if (this.game.contractType === BID.BAWAND) pts = 52;
-        else if (this.game.contractType === BID.LARIES || this.game.contractType === 'double13') pts = 26;
-        else pts = Number(contract) || 9;
 
-        const lblContract = document.getElementById('lbl-surrender-contract');
-        const lblPts = document.getElementById('lbl-surrender-pts');
-        if (lblContract) lblContract.textContent = contractStr;
-        if (lblPts) lblPts.textContent = pts;
+        let pts = 0;
+        if (isDeclarant) {
+            if (this.game.contractType === BID.BAWAND) pts = 52;
+            else if (this.game.contractType === BID.LARIES || this.game.contractType === 'double13') pts = 26;
+            else {
+                const cNum = Number(contract) || 8;
+                pts = (this.game.forcedEight && cNum === 8) ? 8 : (cNum * 2);
+            }
+        } else {
+            if (this.game.contractType === BID.BAWAND) pts = 52;
+            else if (this.game.contractType === BID.LARIES || this.game.contractType === 'double13') pts = 26;
+            else pts = Number(contract) || 9;
+        }
+
+        const msgEl = document.getElementById('lbl-surrender-msg');
+        if (msgEl) {
+            if (isDeclarant) {
+                msgEl.innerHTML = `Do you want to surrender your contract of <strong style="color:var(--gold-light);">${contractStr}</strong> hands?<br>Opponents will win <strong style="color:#ef4444;">+${pts}</strong> points for the failed bid.<br>Your partner must agree. The next hand will start immediately.`;
+            } else {
+                msgEl.innerHTML = `Do you want to surrender this hand?<br>Opponents will win their contract of <strong style="color:var(--gold-light);">${contractStr}</strong> hands (<strong style="color:#ef4444;">+${pts}</strong> pts).<br>Your partner must agree. The next hand will start immediately.`;
+            }
+        }
 
         this._openModal('modal-surrender');
     }
@@ -4500,7 +4719,7 @@ class TekkaUI {
 
         if (!this.onlineMode) {
             // Single player: Partner bot automatically agrees
-            this.showToast('🏳️ Partner stemt in met opgeven. Hand beëindigd.', 3500);
+            this.showToast('🏳️ Partner agreed to surrender. Hand concluded.', 3500);
             const result = this.game.surrenderHand(myTeam);
             this._onRoundEnd(result);
         } else {
@@ -4510,10 +4729,10 @@ class TekkaUI {
 
             if (isPartnerHuman) {
                 this.net.sendSurrenderVoteRequest();
-                this.showToast('📨 Voorstel om op te geven verzonden. Wachten op akkoord van partner...', 3500);
+                this.showToast('📨 Surrender proposal sent. Waiting for partner to agree...', 3500);
             } else {
                 // Partner is a bot -> auto-agree
-                this.showToast('🏳️ Partner stemt in met opgeven. Hand beëindigd.', 3500);
+                this.showToast('🏳️ Partner agreed to surrender. Hand concluded.', 3500);
                 this.net.sendSurrenderConfirmed(myTeam);
                 const result = this.game.surrenderHand(myTeam);
                 this._onRoundEnd(result);
@@ -4526,10 +4745,10 @@ class TekkaUI {
         const partnerSeat = (mySeat + 2) % 4;
         if (Number(data.seat) !== partnerSeat) return;
 
-        const pName = data.name || this.game.players[data.seat]?.name || 'Je partner';
+        const pName = data.name || this.game.players[data.seat]?.name || 'Your partner';
         const modalText = document.getElementById('lbl-partner-surrender-text');
         if (modalText) {
-            modalText.innerHTML = `<strong>${pName}</strong> stelt voor om deze hand op te geven (Surrender).<br>Gaan jullie akkoord met het toekennen van het contract aan de tegenstanders?`;
+            modalText.innerHTML = `<strong>${pName}</strong> proposes to surrender this hand.<br>Do you agree to concede to opponents?`;
         }
         this._openModal('modal-partner-surrender');
     }
@@ -4546,7 +4765,7 @@ class TekkaUI {
                 const result = this.game.surrenderHand(myTeam);
                 this._onRoundEnd(result);
             } else {
-                this.showToast('Je hebt het opgeven geweigerd. Het spel gaat door!', 3000);
+                this.showToast('You declined surrender. Play continues!', 3000);
             }
         }
     }
@@ -4956,9 +5175,9 @@ class TekkaUI {
             titleEl.className = 'round-result-title ' + (didMyTeamWin ? 'made' : 'failed');
             if (surrendered) {
                 if (didMyTeamWin) {
-                    titleEl.textContent = `🎉 Tegenstander heeft opgegeven! (+${pts} pts)`;
+                    titleEl.textContent = `🎉 Opponents Surrendered! (+${pts} pts)`;
                 } else {
-                    titleEl.textContent = `🏳️ Hand Opgegeven (Tegenstanders +${pts} pts)`;
+                    titleEl.textContent = `🏳️ Hand Surrendered! (Opponents +${pts} pts)`;
                 }
             } else if (didMyTeamWin) {
                 if (isMyTeamDeclarant) {
@@ -4980,10 +5199,19 @@ class TekkaUI {
             const scoringTeamName = didMyTeamWin ? 'Your team' : 'Opponents';
             const color = didMyTeamWin ? '#4ade80' : '#f87171';
             if (surrendered) {
-                detailEl.innerHTML =
-                    `De verdediging heeft de hand opgegeven (Surrender).<br>` +
-                    `Contract <strong>${bidLabel}</strong> hands toegekend aan Team ${teamLabel}.<br>` +
-                    `<span style="color:${color};font-weight:800;font-size:1.05rem;">${scoringTeamName} score +${pts} pts!</span>`;
+                const surrTeam = (rr && rr.surrenderingTeam !== undefined) ? Number(rr.surrenderingTeam) : (1 - this.game.declarantTeam);
+                const isDeclSurrender = (surrTeam === this.game.declarantTeam);
+                const surrTeamLabel = surrTeam === 0 ? 'Team N/S' : 'Team W/E';
+                if (isDeclSurrender) {
+                    detailEl.innerHTML =
+                        `${surrTeamLabel} surrendered their contract of <strong>${bidLabel}</strong> hands.<br>` +
+                        `<span style="color:${color};font-weight:800;font-size:1.05rem;">${scoringTeamName} score +${pts} pts!</span>`;
+                } else {
+                    detailEl.innerHTML =
+                        `${surrTeamLabel} surrendered the hand.<br>` +
+                        `Contract <strong>${bidLabel}</strong> hands awarded to Team ${teamLabel}.<br>` +
+                        `<span style="color:${color};font-weight:800;font-size:1.05rem;">${scoringTeamName} score +${pts} pts!</span>`;
+                }
             } else {
                 detailEl.innerHTML =
                     `${declarantName} bid <strong>${bidLabel}</strong> for Team ${teamLabel}<br>` +
@@ -5237,6 +5465,12 @@ class TekkaUI {
                 this.game.cutResult = data.cutResult;
                 this._showCutCardNotification(data.cutResult);
             }
+            if (data.lastCutInfo && data.lastCutInfo.mode === 'classic') {
+                this.game.lastCutInfo = data.lastCutInfo;
+                const winTeamLabel = data.lastCutInfo.winnerTeam === 0 ? 'Team N/S' : 'Team W/E';
+                const oppTeamLabel = data.lastCutInfo.opponentTeam === 0 ? 'Team N/S' : 'Team W/E';
+                this.showToast(`✂️ Classic Cut: ${winTeamLabel} cut ${data.lastCutInfo.cut1} cards to bottom, ${oppTeamLabel} cut ${data.lastCutInfo.cut2} cards. Dealt 13-card packets!`, 4500);
+            }
             this.game.biddingOrder = (data.biddingOrder || []).map(Number);
             this.game.biddingStep = 0;
             this.game.activePlayer = this.game.biddingOrder[0];
@@ -5356,7 +5590,7 @@ class TekkaUI {
             this._closeModal('modal-surrender');
             this._closeModal('modal-partner-surrender');
             const teamLabel = Number(data.surrenderingTeam) === 0 ? 'Team N/S' : 'Team W/E';
-            this.showToast(`🏳️ ${teamLabel} heeft opgegeven.`, 3500);
+            this.showToast(`🏳️ ${teamLabel} surrendered.`, 3500);
             const result = this.game.surrenderHand(Number(data.surrenderingTeam));
             this._onRoundEnd(result);
         };
