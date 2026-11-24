@@ -1716,7 +1716,7 @@ const TARGET_SCORE = 104;
 const TOTAL_TRICKS = 13;
 const MIN_BID = 9;              // Regular voluntary opening bids must be 9 or higher
 const FORCED_MIN_BID = 8;       // Last bidder forced minimum when all pass
-const MAX_BID = 13;
+const MAX_BID = 12;             // Numeric bids capped at 12; 13 is strictly Laries or Bawand!
 
 const TekkaRules = {
 
@@ -1863,14 +1863,44 @@ const TekkaRules = {
     },
 
     // Determine which cards are legal to play
-    legalCards(hand, trick, trump) {
+    legalCards(hand, trick, trump, trickNumber = 1) {
+        if (!hand || hand.length === 0) return [];
         if (!trick || trick.length === 0) {
             // Leading: any card
             return [...hand];
         }
         const ledSuit = trick[0].card.suit;
         const sameSuit = hand.filter(c => c.suit === ledSuit);
-        return sameSuit.length > 0 ? sameSuit : [...hand];
+        if (sameSuit.length === 0) {
+            return [...hand];
+        }
+
+        // Rule for TRICK 1 (First trick of the hand, where Rang was led):
+        // Everyone following Rang MUST play their highest card!
+        // If holding unbroken sequence from Ace down (e.g. A and K), player may play any card in that top sequence.
+        // Otherwise (or without Ace), player must play their highest card in the Rang suit.
+        if (trickNumber === 1 && ledSuit === trump) {
+            const hasAce = sameSuit.some(c => c.value === 14);
+            if (hasAce) {
+                const seq = [];
+                let v = 14;
+                while (v >= 2) {
+                    const c = sameSuit.find(card => card.value === v);
+                    if (c) {
+                        seq.push(c);
+                        v--;
+                    } else {
+                        break;
+                    }
+                }
+                return seq.length > 0 ? seq : sameSuit.filter(c => c.value === 14);
+            } else {
+                const maxVal = Math.max(...sameSuit.map(c => c.value));
+                return sameSuit.filter(c => c.value === maxVal);
+            }
+        }
+
+        return sameSuit;
     },
 
     // Determine winner of a completed trick
@@ -2381,7 +2411,8 @@ class TekkaAI {
      * Choose a card to play given the game state.
      */
     static chooseCard(hand, trick, trump, botIndex, gameState, difficulty = 'hard') {
-        const legal = TekkaRules.legalCards(hand, trick, trump);
+        const trickNumber = gameState?.trickNumber || 1;
+        const legal = TekkaRules.legalCards(hand, trick, trump, trickNumber);
         if (legal.length === 1) return legal[0];
 
         const isLeading = (!trick || trick.length === 0);
@@ -2972,10 +3003,11 @@ class TekkaGame {
                 return { error: 'Illegal lead card for Rang: must be Ace or unbroken honor sequence (A-K, A-K-Q, etc.) when holding Ace' };
             }
         } else if (this.phase === PHASE.PLAYING) {
-            const legal = TekkaRules.legalCards(this.hands[seatIndex], this.currentTrick, this.trump);
+            const legal = TekkaRules.legalCards(this.hands[seatIndex], this.currentTrick, this.trump, this.trickNumber);
             const actualCard = this.hands[seatIndex][cardIdx];
             if (!legal.some(c => c.id === actualCard.id || (c.suit === actualCard.suit && String(c.rank) === String(actualCard.rank)))) {
-                return { error: 'Illegal card: must follow suit' };
+                const isTrick1Rang = (this.trickNumber === 1 && this.currentTrick.length > 0 && this.currentTrick[0].card.suit === this.trump);
+                return { error: isTrick1Rang ? 'Trick 1: you must play your highest Rang card!' : 'Illegal card: must follow suit' };
             }
         }
 
@@ -3353,7 +3385,7 @@ class TekkaGame {
         if (this.phase === PHASE.TRUMP_LEAD && seatIndex === this.activePlayer) {
             return TekkaRules.legalTrumpLeads(this.hands[seatIndex]);
         }
-        return TekkaRules.legalCards(this.hands[seatIndex], this.currentTrick, this.trump);
+        return TekkaRules.legalCards(this.hands[seatIndex], this.currentTrick, this.trump, this.trickNumber);
     }
 
     getLegalBids() {
@@ -4685,6 +4717,8 @@ class TekkaUI {
             this._updateTrumpDisplay();
             const suit = SUIT_NAMES[result.trump];
             this.showToast(`🎴 Trump is ${SUIT_SYMBOLS[result.trump]} ${suit}!`, 3500);
+            this._updateRaiseBidButton();
+            this._updateSurrenderButton();
         }
 
         // Animate card to trick area
@@ -4752,18 +4786,16 @@ class TekkaUI {
 
     _updateRaiseBidButton() {
         if (!this.elBtnRaise) return;
-        const mySeat = this._getMySeat();
+        const curBidNum = Number(this.game.highBid);
         const defTeam = 1 - (this.game.declarantTeam !== null ? this.game.declarantTeam : 0);
         const defTricks = (this.game.teamTricks && this.game.teamTricks[defTeam] !== undefined)
             ? this.game.teamTricks[defTeam] : 0;
         const maxPossible = 13 - defTricks;
-        const curBidNum = Number(this.game.highBid);
 
         const canRaise = (
             this.game.phase === PHASE.PLAYING &&
-            this.game.highBidder === mySeat &&
             !isNaN(curBidNum) &&
-            curBidNum < maxPossible &&
+            curBidNum < Math.min(12, maxPossible) &&
             this.game.contractType !== BID.BAWAND &&
             this.game.contractType !== BID.LARIES
         );
@@ -4869,11 +4901,28 @@ class TekkaUI {
     }
 
     _openRaiseBidModal() {
+        const mySeat = this._getMySeat();
+        const myTeam = TekkaRules.teamOf(mySeat);
+        const isDeclarant = (myTeam === this.game.declarantTeam);
         const curBidNum = Number(this.game.highBid);
         const defTeam = 1 - (this.game.declarantTeam !== null ? this.game.declarantTeam : 0);
         const defTricks = (this.game.teamTricks && this.game.teamTricks[defTeam] !== undefined)
             ? this.game.teamTricks[defTeam] : 0;
         const maxPossible = 13 - defTricks;
+
+        const elTitle = document.querySelector('#modal-raise-bid .modal-title');
+        if (elTitle) {
+            elTitle.textContent = isDeclarant ? '📈 Raise Contract' : '⚔️ Challenge Declarant Contract';
+        }
+
+        const elDesc = document.querySelector('#modal-raise-bid .modal-body p');
+        if (elDesc) {
+            if (isDeclarant) {
+                elDesc.innerHTML = `Current contract: <strong style="color:var(--gold-light);">${curBidNum}</strong> hands.<br>Propose a higher contract to opponents. If opponents decline, they concede and you win immediately! If they accept, play continues for the higher bid.`;
+            } else {
+                elDesc.innerHTML = `Current contract: <strong style="color:var(--gold-light);">${curBidNum}</strong> hands.<br>Challenge declarants to make a higher contract! If declarants decline, they concede and your team wins immediately! If they accept, their target is raised.`;
+            }
+        }
 
         const elCurrent = document.getElementById('raise-current-bid');
         if (elCurrent) elCurrent.textContent = curBidNum;
@@ -4882,10 +4931,9 @@ class TekkaUI {
         if (!container) return;
         container.innerHTML = '';
 
-        // Only numeric bids between curBidNum + 1 and maxPossible (13 - defTricks)
-        // No Laries or Bawand allowed for mid-game raises!
+        // Only numeric bids between curBidNum + 1 and maxPossible, capped at 12
         const raiseOptions = [];
-        for (let b = curBidNum + 1; b <= maxPossible; b++) {
+        for (let b = curBidNum + 1; b <= Math.min(12, maxPossible); b++) {
             raiseOptions.push(b);
         }
 
@@ -4911,22 +4959,42 @@ class TekkaUI {
 
     _submitBidRaise(newBid) {
         const oldBid = this.game.highBid;
+        const mySeat = this._getMySeat();
+        const myTeam = TekkaRules.teamOf(mySeat);
+        const isDeclarant = (myTeam === this.game.declarantTeam);
+
         if (!this.onlineMode) {
-            // Bot defenders decide whether to accept
-            const defTeam = 1 - this.game.declarantTeam;
-            const defTricks = this.game.teamTricks[defTeam];
-            const neededToDefeat = 14 - Number(newBid);
-            // Bots accept if they feel they have a good shot at stopping it for double points
-            const botAccepts = (defTricks >= neededToDefeat - 2) && Math.random() < 0.45;
-            if (botAccepts) {
-                this.game.applyBidRaise(newBid);
-                this.game.highBid = newBid;
-                this.showToast(`✓ Opponents accepted raise to ${this._formatBid(newBid)} hands! Game continues.`, 3500);
-                this._updateContractDisplay();
+            if (isDeclarant) {
+                // Declarant raises -> Bot defenders decide whether to accept
+                const defTeam = 1 - this.game.declarantTeam;
+                const defTricks = this.game.teamTricks[defTeam];
+                const neededToDefeat = 14 - Number(newBid);
+                const botAccepts = (defTricks >= neededToDefeat - 2) && Math.random() < 0.45;
+                if (botAccepts) {
+                    this.game.applyBidRaise(newBid);
+                    this.game.highBid = newBid;
+                    this.showToast(`✓ Opponents accepted raise to ${this._formatBid(newBid)} hands! Game continues.`, 3500);
+                    this._updateContractDisplay();
+                } else {
+                    this.showToast(`✕ Opponents declined raise! Conceded original ${this._formatBid(oldBid)} hands to you.`, 4000);
+                    const result = this.game.concedeOriginalBid();
+                    this._onRoundEnd(result);
+                }
             } else {
-                this.showToast(`✕ Opponents declined raise! Conceded original ${this._formatBid(oldBid)} hands to you.`, 4000);
-                const result = this.game.concedeOriginalBid();
-                this._onRoundEnd(result);
+                // Defender challenges declarant -> Bot declarant decides whether to accept
+                const decTricks = this.game.teamTricks[this.game.declarantTeam];
+                const neededToMake = Number(newBid);
+                const botAccepts = (decTricks + 3 >= neededToMake) && Math.random() < 0.5;
+                if (botAccepts) {
+                    this.game.applyBidRaise(newBid);
+                    this.game.highBid = newBid;
+                    this.showToast(`✓ Declarant accepted your challenge to make ${this._formatBid(newBid)} hands!`, 3500);
+                    this._updateContractDisplay();
+                } else {
+                    this.showToast(`✕ Declarant declined your challenge! Conceded hand to your team.`, 4000);
+                    const result = this.game.surrenderHand(this.game.declarantTeam);
+                    this._onRoundEnd(result);
+                }
             }
         } else {
             this.net.sendBidRaiseRequest(newBid);
@@ -4937,8 +5005,10 @@ class TekkaUI {
     _onReceiveBidRaiseRequest(data) {
         const mySeat = this._getMySeat();
         const myTeam = TekkaRules.teamOf(mySeat);
-        // Only defending team gets to decide
-        if (myTeam === this.game.declarantTeam) {
+        const fromDeclarant = (TekkaRules.teamOf(data.seat) === this.game.declarantTeam);
+        const amDeclarant = (myTeam === this.game.declarantTeam);
+
+        if (fromDeclarant === amDeclarant) {
             this.showToast(`Partner proposed raising to ${this._formatBid(data.newBid)}. Waiting for opponents...`, 3500);
             return;
         }
@@ -4959,6 +5029,10 @@ class TekkaUI {
 
     _respondToBidRaise(accept) {
         this._closeModal('modal-respond-raise');
+        const mySeat = this._getMySeat();
+        const myTeam = TekkaRules.teamOf(mySeat);
+        const isDeclarant = (myTeam === this.game.declarantTeam);
+
         if (this.onlineMode) {
             this.net.sendBidRaiseResponse(accept);
         }
@@ -4970,9 +5044,15 @@ class TekkaUI {
             }
             this.showToast('You accepted the higher bid challenge! Game continues.', 3000);
         } else {
-            this.showToast(`You declined the raise. Conceded ${this._formatBid(this.game.highBid)} hands to them.`, 3500);
-            const result = this.game.concedeOriginalBid();
-            this._onRoundEnd(result);
+            if (isDeclarant) {
+                this.showToast(`You declined the challenge. Conceded hand to opponents.`, 3500);
+                const result = this.game.surrenderHand(this.game.declarantTeam);
+                this._onRoundEnd(result);
+            } else {
+                this.showToast(`You declined the raise. Conceded ${this._formatBid(this.game.highBid)} hands to them.`, 3500);
+                const result = this.game.concedeOriginalBid();
+                this._onRoundEnd(result);
+            }
         }
     }
 
