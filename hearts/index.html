@@ -1667,59 +1667,8 @@ html, body {
     }
 }
 
-    
-/* ===================== MAIN MENU SCREEN ===================== */
-#screen-main-hearts {
-    position: fixed; inset: 0;
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    background: radial-gradient(ellipse at 50% 0%, rgba(240,165,0,0.08) 0%, transparent 60%),
-                linear-gradient(180deg, #122b1e 0%, #1a3a2a 50%, #0f2318 100%);
-    z-index: 9999;
-    padding: 24px 16px;
-    gap: 10px;
-}
-#screen-main-hearts .main-logo { text-align: center; margin-bottom: 24px; }
-#screen-main-hearts .suit-row {
-    font-size: 2rem; letter-spacing: 10px; color: #9abba7;
-}
-#screen-main-hearts .suit-row .red { color: #e53935; }
-#screen-main-hearts .game-title {
-    font-size: 3rem; font-weight: 900; color: #f0a500;
-    text-shadow: 0 0 24px rgba(240,165,0,0.4);
-    letter-spacing: 3px; text-transform: uppercase;
-    margin-top: 6px;
-}
-#screen-main-hearts .game-subtitle {
-    font-size: 0.9rem; color: #9abba7; margin-top: 4px;
-    font-style: italic; letter-spacing: 1px;
-}
-#screen-main-hearts .menu-buttons {
-    display: flex; flex-direction: column; gap: 12px;
-    width: 100%; max-width: 320px;
-}
-#screen-main-hearts .btn-menu-main {
-    display: flex; align-items: center; justify-content: center;
-    gap: 8px; padding: 14px 20px;
-    border-radius: 12px; border: 2px solid rgba(240,165,0,0.3);
-    font-size: 1.05rem; font-weight: 700;
-    cursor: pointer; transition: all 0.15s;
-    text-decoration: none; color: #f8fafc;
-}
-#screen-main-hearts .btn-menu-main.primary {
-    background: #f0a500; color: #1a1a1a; border-color: #f0a500;
-    font-size: 1.15rem;
-}
-#screen-main-hearts .btn-menu-main.primary:hover { background: #ffd166; }
-#screen-main-hearts .btn-menu-main.online {
-    background: rgba(34,197,94,0.15); border-color: rgba(34,197,94,0.4); color: #4ade80;
-}
-#screen-main-hearts .btn-menu-main.online:hover { background: rgba(34,197,94,0.25); }
-#screen-main-hearts .btn-menu-main.secondary {
-    background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.15); color: #d1d5db;
-}
-#screen-main-hearts .btn-menu-main.secondary:hover { background: rgba(255,255,255,0.12); }
-</style>
+    </style>
+
 
 
 
@@ -2446,6 +2395,7 @@ html, body {
     </script>
 
     <!-- Scripts (Ordered cleanly so no CORS or bundling is required!) -->
+    
     
     
     
@@ -3241,6 +3191,49 @@ window.HeartsRules = HeartsRules;
 
 class HeartsAI {
     /**
+     * Evaluates whether a player should attempt to Shoot the Moon
+     * @param {Array<Card>} hand
+     * @param {string} difficulty
+     * @returns {boolean}
+     */
+    static evaluateMoonAmbition(hand, difficulty = 'hard') {
+        if (difficulty === 'easy' || !hand || hand.length === 0) return false;
+
+        const hearts = hand.filter(c => c.suit === SUITS.HEARTS);
+        const highHearts = hearts.filter(c => c.rank >= 11);
+        const topHearts = hearts.filter(c => c.rank >= 13); // Ace or King of hearts
+        const spades = hand.filter(c => c.suit === SUITS.SPADES);
+        const hasAceSpades = spades.some(c => c.rank === 14);
+        const hasKingSpades = spades.some(c => c.rank === 13);
+        const hasQueenSpades = hand.some(c => c.isQueenOfSpades());
+        const totalAces = hand.filter(c => c.rank === 14).length;
+        const totalKings = hand.filter(c => c.rank === 13).length;
+        const totalBosses = totalAces + totalKings;
+        const totalHonors = hand.filter(c => c.rank >= 11).length;
+
+        // Condition 1: Heart master with boss backing
+        // 5+ hearts with A or K of hearts, plus 2+ Aces/Kings and safe or owned Queen of Spades
+        const condHeartMaster = hearts.length >= 5 && topHearts.length >= 1 && totalBosses >= 2 && (hasQueenSpades || hasAceSpades || spades.length >= 3);
+
+        // Condition 2: Deep heart control with Queen of Spades
+        // 4+ hearts with at least 1 high heart, plus Queen of Spades and 2+ Aces/Kings
+        const condQueenControl = hearts.length >= 4 && highHearts.length >= 1 && hasQueenSpades && totalBosses >= 2;
+
+        // Condition 3: Multi-suit Boss dominance
+        // 6+ honors (J, Q, K, A) with at least 3 Aces/Kings, and at least 3 hearts
+        const condDominance = totalHonors >= 6 && totalBosses >= 3 && hearts.length >= 3;
+
+        // Condition 4: Absolute powerhouse hand
+        // 7+ honors or 4+ Aces/Kings regardless of distribution
+        const condPowerhouse = totalHonors >= 7 || totalBosses >= 4;
+
+        // Condition 5: Opportunistic ambition (40% probability when having solid foundation)
+        const condOpportunistic = (difficulty === 'hard') && (Math.random() < 0.40) && (totalBosses >= 2) && (hasQueenSpades || hasAceSpades) && (hearts.length >= 4);
+
+        return condHeartMaster || condQueenControl || condDominance || condPowerhouse || condOpportunistic;
+    }
+
+    /**
      * Chooses 3 cards to pass during the passing phase
      * Supports both (player, hand, direction, difficulty) and legacy (hand, direction, difficulty)
      * @param {object|Array<Card>} playerOrHand
@@ -3278,25 +3271,7 @@ class HeartsAI {
         // 1. MOON AMBITION CHECK
         // Should the bot attempt to Shoot the Moon?
         // ========================================================
-        const hearts = hand.filter(c => c.suit === SUITS.HEARTS);
-        const highHearts = hearts.filter(c => c.rank >= 11);
-        const spades = hand.filter(c => c.suit === SUITS.SPADES);
-        const hasAceSpades = spades.some(c => c.rank === 14);
-        const hasKingSpades = spades.some(c => c.rank === 13);
-        const hasQueenSpades = hand.some(c => c.isQueenOfSpades());
-        const totalAces = hand.filter(c => c.rank === 14).length;
-        const totalKings = hand.filter(c => c.rank === 13).length;
-        const totalHighCards = hand.filter(c => c.rank >= 11).length;
-
-        // Moon qualification conditions:
-        // A) Massive heart suit (>= 6) with high honors + strong spades
-        const moonConditionA = hearts.length >= 6 && highHearts.length >= 3 && (hasQueenSpades || (hasAceSpades && hasKingSpades));
-        // B) High concentration of top bosses across suits (>= 6 honors, >= 3 Aces/Kings)
-        const moonConditionB = totalHighCards >= 6 && (totalAces + totalKings >= 3) && (hasQueenSpades || hasAceSpades || spades.length >= 4);
-        // C) Opportunistic aggressive ambition (random chance if dealt strong hand)
-        const moonConditionC = (difficulty === 'hard' && Math.random() < 0.28 && totalHighCards >= 5 && (totalAces + totalKings >= 2));
-
-        const isAttemptingMoon = (moonConditionA || moonConditionB || moonConditionC) && difficulty !== 'easy';
+        const isAttemptingMoon = this.evaluateMoonAmbition(hand, difficulty);
 
         if (player && player.memory) {
             player.memory.attemptingMoon = isAttemptingMoon;
@@ -3304,111 +3279,126 @@ class HeartsAI {
 
         // --------------------------------------------------------
         // When Shooting the Moon:
-        // KEEP: All high cards (ranks >= 10), high Hearts, Queen of Spades, Aces, Kings.
+        // KEEP: Queen of Spades, high Hearts (10, J, Q, K, A), all Aces and Kings.
         // PASS: 3 LOW off-suit cards from shortest suits (giving opponents low junk).
         // --------------------------------------------------------
         if (isAttemptingMoon) {
-            const lowJunkCandidates = hand.filter(c => {
-                if (c.isQueenOfSpades()) return false;
-                if (c.isHeart() && c.rank >= 9) return false;
-                if (c.rank >= 11) return false; // Keep Jacks, Queens, Kings, Aces
-                return true;
+            const moonCandidates = [...hand].sort((a, b) => {
+                // NEVER pass Queen of Spades when shooting moon
+                if (a.isQueenOfSpades()) return 1;
+                if (b.isQueenOfSpades()) return -1;
+
+                // Protect high Hearts (10, J, Q, K, A)
+                const aHighHeart = a.isHeart() && a.rank >= 10;
+                const bHighHeart = b.isHeart() && b.rank >= 10;
+                if (aHighHeart && !bHighHeart) return 1;
+                if (!aHighHeart && bHighHeart) return -1;
+
+                // Protect all Aces and Kings
+                const aBoss = a.rank >= 13;
+                const bBoss = b.rank >= 13;
+                if (aBoss && !bBoss) return 1;
+                if (!aBoss && bBoss) return -1;
+
+                // Prefer passing non-hearts over hearts
+                if (a.isHeart() && !b.isHeart()) return 1;
+                if (!a.isHeart() && b.isHeart()) return -1;
+
+                // Pass lowest rank first
+                return a.rank - b.rank;
             });
 
-            // Score junk candidates: prioritize lowest ranks and shortest suits
-            const junkScores = lowJunkCandidates.map(card => {
-                const suitCount = hand.filter(c => c.suit === card.suit).length;
-                let score = 100 - card.rank * 5; // Lower rank = higher pass priority
-                if (suitCount <= 2 && !card.isHeart()) score += 20; // Void short offsuits
-                score += (Math.random() - 0.5) * 10;
-                return { card, score };
-            });
-
-            junkScores.sort((a, b) => b.score - a.score);
-
-            if (junkScores.length >= 3) {
-                const selected = junkScores.slice(0, 3).map(item => item.card);
-                if (player && player.memory) {
-                    player.memory.passedCards = [...selected];
-                }
-                return selected;
+            const selected = moonCandidates.slice(0, 3);
+            if (player && player.memory) {
+                player.memory.passedCards = [...selected];
             }
+            return selected;
         }
 
         // ========================================================
-        // 2. DEFENSIVE / TACTICAL PASSING WITH VARIETY & RANDOMIZATION
+        // 2. DEFENSIVE / TACTICAL PASSING WITH DIVERSE STRATEGIES ("SOMS SLECHT, SOMS GOED")
         // ========================================================
         if (player && player.memory) {
             player.memory.attemptingMoon = false;
         }
 
-        // Personality style for this specific pass
-        const botStyle = Math.random();
-        const preferVoiding = botStyle < 0.45;       // 45% chance bot focuses heavily on creating voids
-        const keepProtectedQueen = botStyle < 0.50;  // 50% chance bot holds Queen of Spades if guarded
-
+        const spades = hand.filter(c => c.suit === SUITS.SPADES);
         const spadeCount = spades.length;
+
+        // Choose a passing archetype for this pass
+        // 1. VOIDER (35%): Targets short suits (even low/mid cards) to create an immediate void!
+        // 2. AMBUSH (25%): Keeps guarded Queen of Spades or boss spades, passes middle junk (7-11).
+        // 3. RANDOM_MIX (25%): High variation / casual pass ("soms slecht, soms goed").
+        // 4. CLASSIC (15%): Traditional high-card dump.
+        const roll = Math.random();
+        let passStrategy = 'CLASSIC';
+        if (roll < 0.35) passStrategy = 'VOIDER';
+        else if (roll < 0.60) passStrategy = 'AMBUSH';
+        else if (roll < 0.85) passStrategy = 'RANDOM_MIX';
 
         const cardScores = hand.map(card => {
             let score = 0;
 
-            // 1. Queen of Spades
-            if (card.isQueenOfSpades()) {
-                if (spadeCount <= 3) {
-                    // Unprotected: Highly dangerous to keep!
-                    score += 180 + Math.random() * 30;
-                } else {
-                    // Protected (4+ spades in hand):
-                    if (keepProtectedQueen) {
-                        // Hold Queen as an ambush weapon to drop on opponent's Ace/King
-                        score += 35 + Math.random() * 25;
-                    } else {
-                        score += 115 + Math.random() * 30;
-                    }
-                }
-            }
-
-            // 2. Ace and King of Spades
-            if (card.suit === SUITS.SPADES && (card.rank === 14 || card.rank === 13)) {
-                if (spadeCount <= 3) {
-                    // Dangerous: might be forced to win Queen of Spades
-                    score += 135 + Math.random() * 30;
-                } else {
-                    // Guarded: safer to hold
-                    score += 55 + Math.random() * 25;
-                }
-            }
-
-            // 3. High Hearts
-            if (card.suit === SUITS.HEARTS) {
-                if (card.rank === 14) score += 92 + Math.random() * 25; // Ace of Hearts
-                else if (card.rank === 13) score += 82 + Math.random() * 25; // King of Hearts
-                else if (card.rank === 12) score += 68 + Math.random() * 20; // Queen of Hearts
-                else if (card.rank >= 10) score += 42 + Math.random() * 15;
-                else score -= (20 - card.rank * 2); // Keep low hearts to duck!
-            }
-
-            // 4. Void Creation (Short Suits in Clubs & Diamonds)
-            if (card.suit === SUITS.CLUBS || card.suit === SUITS.DIAMONDS) {
+            if (passStrategy === 'VOIDER') {
+                // Focus heavily on creating voids in short non-heart suits (Clubs, Diamonds, low Spades)
                 const suitCount = hand.filter(c => c.suit === card.suit).length;
-                if (suitCount === 1) {
-                    // Singleton: passing it creates an instant void!
-                    score += preferVoiding ? 95 : 65;
-                } else if (suitCount === 2) {
-                    score += preferVoiding ? 60 : 40;
-                } else if (suitCount === 3) {
-                    score += preferVoiding ? 35 : 20;
+                if (card.suit === SUITS.CLUBS || card.suit === SUITS.DIAMONDS) {
+                    if (suitCount === 1) score += 165; // Singleton: immediate void!
+                    else if (suitCount === 2) score += 120; // Doubleton
+                    else if (suitCount === 3) score += 75;
                 }
+                // If Queen of Spades is unguarded, dump it
+                if (card.isQueenOfSpades()) {
+                    score += spadeCount <= 3 ? 180 : 30;
+                }
+                // High off-suit cards
+                if (card.rank === 14) score += 40;
+                if (card.rank === 13) score += 30;
+                // Add moderate noise
+                score += (Math.random() - 0.5) * 20;
 
-                // High cards in offsuits
-                if (card.rank === 14) score += 40 + Math.random() * 20; // Ace
-                if (card.rank === 13) score += 30 + Math.random() * 18; // King
-                if (card.rank === 12) score += 20 + Math.random() * 12; // Queen
+            } else if (passStrategy === 'AMBUSH') {
+                // Keep protected Queen and King of Spades to trap opponents later!
+                if (card.isQueenOfSpades()) {
+                    score += spadeCount <= 3 ? 160 : -40; // Hold Queen if protected (4+ spades)
+                } else if (card.suit === SUITS.SPADES && card.rank >= 13) {
+                    score += spadeCount <= 3 ? 120 : -20; // Hold A/K of spades if protected
+                }
+                // Pass awkward middle cards (ranks 7 through 11) that are tricky to duck
+                if (card.rank >= 7 && card.rank <= 11 && !card.isHeart()) {
+                    score += 85 + (card.rank * 3);
+                }
+                // High hearts still dangerous
+                if (card.suit === SUITS.HEARTS && card.rank >= 12) {
+                    score += 65;
+                }
+                score += (Math.random() - 0.5) * 25;
+
+            } else if (passStrategy === 'RANDOM_MIX') {
+                // "Soms slecht, soms goed": wide spread of cards passed
+                score += card.rank * 4; // Moderate rank factor
+                if (card.isQueenOfSpades()) score += 70;
+                if (card.isHeart()) score += (card.rank >= 11 ? 50 : -20);
+                // Large noise factor so low, mid and high cards all get passed unpredictably
+                score += (Math.random() - 0.5) * 110;
+
+            } else {
+                // CLASSIC high danger card dump
+                if (card.isQueenOfSpades()) {
+                    score += 180 + Math.random() * 20;
+                } else if (card.suit === SUITS.SPADES && (card.rank === 14 || card.rank === 13)) {
+                    score += 130 + Math.random() * 20;
+                } else if (card.suit === SUITS.HEARTS) {
+                    if (card.rank === 14) score += 95 + Math.random() * 20;
+                    else if (card.rank === 13) score += 85 + Math.random() * 20;
+                    else if (card.rank === 12) score += 70 + Math.random() * 15;
+                    else if (card.rank >= 10) score += 40 + Math.random() * 10;
+                } else {
+                    if (card.rank === 14) score += 45 + Math.random() * 15;
+                    if (card.rank === 13) score += 35 + Math.random() * 15;
+                }
+                score += (Math.random() - 0.5) * 20;
             }
-
-            // 5. Randomized Noise / Personality Jitter
-            // Prevents bots from deterministically passing identical cards every round
-            score += (Math.random() - 0.5) * 36;
 
             return { card, score };
         });
@@ -5013,6 +5003,11 @@ class HeartsGame {
             const p = this.players[i];
             p.hand.push(...p.receivedCards);
             this.sortPlayerHand(i);
+
+            // Re-evaluate moon ambition for AI players with their updated hand
+            if (!p.isHuman && p.memory) {
+                p.memory.attemptingMoon = HeartsAI.evaluateMoonAmbition(p.hand, this.settings.aiDifficulty);
+            }
         }
 
         if (window.soundEngine) window.soundEngine.playCardPass();
@@ -5036,6 +5031,13 @@ class HeartsGame {
     finishPassingPhase() {
         this.currentPhase = HeartsGame.PHASES.PLAYING;
         this.trickNumber = 1;
+
+        // Re-evaluate moon ambition for all AI players right before trick play begins
+        this.players.forEach(p => {
+            if (!p.isHuman && p.memory) {
+                p.memory.attemptingMoon = HeartsAI.evaluateMoonAmbition(p.hand, this.settings.aiDifficulty);
+            }
+        });
 
         // Player with 2 of Clubs leads first trick
         let starterIndex = 0;
@@ -6161,9 +6163,6 @@ class TableUI {
     }
 
     handleCardClick(playerIndex, card) {
-        // Double-play guard: prevent two cards being played simultaneously
-        if (this._playLock) return;
-
         // Online Guest routing
         if (window.heartsNetwork && window.heartsNetwork.isConnected && !window.heartsNetwork.isHost) {
             // Passing phase for Online Guest
@@ -6217,10 +6216,8 @@ class TableUI {
                 return;
             }
 
-            // Send play to Host — set lock, released when server confirms play
-            this._playLock = true;
+            // Send play to Host
             window.heartsNetwork.playCard(card);
-            setTimeout(() => { this._playLock = false; }, 1500); // safety release
             return;
         }
 
@@ -6274,11 +6271,8 @@ class TableUI {
                 return;
             }
 
-            // Lock to prevent double-play; released after game state update
-            this._playLock = true;
+            // Execute play
             this.game.playCard(playerIndex, card);
-            // _playLock released by renderHands/updateControls after state update
-            setTimeout(() => { this._playLock = false; }, 800); // safety release
         }
     }
 
@@ -6383,17 +6377,7 @@ class TableUI {
     // ----------------------------------------------------
 
     showScoreboardModal() {
-        // For online guests: use received data instead of local game state
-        if (this.onlineIsGuest && !this.game) {
-            this.showOnlineGuestScoreboard();
-            return;
-        }
         if (!this.game || !this.modalScoreboard) return;
-        // If guest is in online mode but game obj also exists, still use online data
-        if (this.onlineIsGuest && this.onlineScoreHistory) {
-            this.showOnlineGuestScoreboard();
-            return;
-        }
         const tbody = document.getElementById('scoreboard-table-body');
         const headers = document.querySelectorAll('.scoreboard-player-header');
         
@@ -6428,47 +6412,6 @@ class TableUI {
             <td>${this.game.players[3].totalScore}</td>
         `;
         tbody.appendChild(totalRow);
-
-        this.modalScoreboard.classList.remove('hidden');
-    }
-
-    // Shows scoreboard for online guests (uses data received from host)
-    showOnlineGuestScoreboard() {
-        if (!this.modalScoreboard) return;
-        const tbody = document.getElementById('scoreboard-table-body');
-        const headers = document.querySelectorAll('.scoreboard-player-header');
-        const names = this.onlinePlayerNames || ['P1','P2','P3','P4'];
-        names.forEach((n, idx) => { if (headers[idx]) headers[idx].textContent = n; });
-        tbody.innerHTML = '';
-
-        const history = this.onlineScoreHistory || [];
-        history.forEach((roundScores, r) => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td class="font-bold">Round ${r + 1}</td>
-                <td>${roundScores[0] ?? '-'}</td>
-                <td>${roundScores[1] ?? '-'}</td>
-                <td>${roundScores[2] ?? '-'}</td>
-                <td>${roundScores[3] ?? '-'}</td>
-            `;
-            tbody.appendChild(tr);
-        });
-
-        const totals = this.onlineTotalScores || [0,0,0,0];
-        const totalRow = document.createElement('tr');
-        totalRow.className = 'bg-amber-100 font-extrabold text-amber-900 border-t-2 border-amber-300';
-        totalRow.innerHTML = `
-            <td>TOTAL</td>
-            <td>${totals[0]}</td>
-            <td>${totals[1]}</td>
-            <td>${totals[2]}</td>
-            <td>${totals[3]}</td>
-        `;
-        tbody.appendChild(totalRow);
-
-        // Add "Next Round" button
-        const nextRoundBtn = document.getElementById('btn-next-round');
-        if (nextRoundBtn) nextRoundBtn.classList.add('hidden'); // guests don't control next round
 
         this.modalScoreboard.classList.remove('hidden');
     }
@@ -7264,18 +7207,6 @@ class TableUI {
                 if (window.soundEngine) window.soundEngine.playMoonFanfare();
             }
             this.updateOnlinePlayerBadges(data.totalScores);
-
-            // Track round score history for guest scoreboard
-            if (data.roundData && data.roundData.finalScores) {
-                if (!this.onlineScoreHistory) this.onlineScoreHistory = [];
-                this.onlineScoreHistory.push(data.roundData.finalScores);
-            }
-            if (data.totalScores) {
-                this.onlineTotalScores = data.totalScores;
-            }
-
-            // Show scoreboard for guest
-            this.showOnlineGuestScoreboard();
             this.showToast('Round completed! Preparing next round...', 3000);
         };
 
@@ -7522,12 +7453,6 @@ class TableUI {
             }
 
             if (roomParam) {
-                // Ensure main menu is hidden and game app is visible
-                const mainMenu = document.getElementById('screen-main-hearts');
-                if (mainMenu) mainMenu.style.display = 'none';
-                const app = document.getElementById('app');
-                if (app) app.style.display = 'flex';
-
                 // Instead of auto-joining with a hardcoded name, show the Join tab
                 // pre-filled with the room code & password so the friend can enter their own name.
                 setTimeout(() => {
@@ -7628,33 +7553,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     ui.bindGame(initialGame);
-    // Game starts from menu button
-    window._heartsUI = ui;
-    window._heartsGame = initialGame;
-    document.getElementById("hearts-btn-new-game").addEventListener("click", function() {
-        initialGame.startNewGame();
-    });
-    document.getElementById("hearts-btn-online").addEventListener("click", function() {
-        document.getElementById("screen-main-hearts").style.display = "none";
-        document.getElementById("app").style.display = "flex";
-        initialGame.startNewGame();
-        var onlineModal = document.getElementById("modal-online");
-        if (onlineModal) onlineModal.classList.remove("hidden");
-    });
-    document.getElementById("hearts-btn-rules").addEventListener("click", function() {
-        document.getElementById("screen-main-hearts").style.display = "none";
-        document.getElementById("app").style.display = "flex";
-        initialGame.startNewGame();
-        var rulesModal = document.getElementById("modal-rules");
-        if (rulesModal) rulesModal.classList.remove("hidden");
-    });
-    document.getElementById("hearts-btn-settings").addEventListener("click", function() {
-        document.getElementById("screen-main-hearts").style.display = "none";
-        document.getElementById("app").style.display = "flex";
-        initialGame.startNewGame();
-        var settingsModal = document.getElementById("modal-settings");
-        if (settingsModal) settingsModal.classList.remove("hidden");
-    });
+    initialGame.startNewGame();
 
     // Toggle Pass-and-Play human count visibility in New Game modal
     const radioModes = document.querySelectorAll('input[name="game-mode"]');
