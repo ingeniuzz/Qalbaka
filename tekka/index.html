@@ -932,7 +932,7 @@ html, body {
         <button id="btn-game-menu" class="btn-icon" title="Menu">☰</button>
 
         <div class="trump-display">
-            <span class="trump-label">Trump:</span>
+            <span class="trump-label">Rang:</span>
             <span id="trump-icon"></span>
             <span id="trump-suit">TBD</span>
         </div>
@@ -942,7 +942,7 @@ html, body {
         <div class="score-badges">
             <span id="score-team-a" class="score-badge team-a">N/S: 0</span>
             <span id="score-team-b" class="score-badge team-b">W/E: 0</span>
-            <button id="btn-raise-bid" class="btn-icon-sm hidden" title="Raise contract tricks" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#000;font-weight:700;padding:2px 8px;font-size:0.75rem;border-radius:4px;border:none;cursor:pointer;">📈 Raise</button>
+            <button id="btn-raise-bid" class="btn-icon-sm hidden" title="Raise contract hands" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#000;font-weight:700;padding:2px 8px;font-size:0.75rem;border-radius:4px;border:none;cursor:pointer;">📈 Raise</button>
         </div>
     </header>
 
@@ -965,7 +965,7 @@ html, body {
                 <span class="avatar">🤖</span>
                 <div>
                     <div class="p-name">North Bot</div>
-                    <div class="p-score">Tricks: <span id="tricks-2">0</span></div>
+                    <div class="p-score">Hands: <span id="tricks-2">0</span></div>
                 </div>
             </div>
             <div id="player-bid-2" class="player-bid-badge hidden"></div>
@@ -980,7 +980,7 @@ html, body {
                 <span class="avatar">🤖</span>
                 <div>
                     <div class="p-name">West Bot</div>
-                    <div class="p-score">Tricks: <span id="tricks-1">0</span></div>
+                    <div class="p-score">Hands: <span id="tricks-1">0</span></div>
                 </div>
             </div>
             <div id="player-bid-1" class="player-bid-badge hidden"></div>
@@ -994,7 +994,7 @@ html, body {
                 <span class="avatar">🤖</span>
                 <div>
                     <div class="p-name">East Bot</div>
-                    <div class="p-score">Tricks: <span id="tricks-3">0</span></div>
+                    <div class="p-score">Hands: <span id="tricks-3">0</span></div>
                 </div>
             </div>
             <div id="player-bid-3" class="player-bid-badge hidden"></div>
@@ -1009,7 +1009,7 @@ html, body {
                 <span class="avatar">🧑‍💼</span>
                 <div>
                     <div class="p-name">You</div>
-                    <div class="p-score">Tricks: <span id="tricks-0">0</span></div>
+                    <div class="p-score">Hands: <span id="tricks-0">0</span></div>
                 </div>
             </div>
         </div>
@@ -1179,8 +1179,8 @@ html, body {
         </div>
         <div class="modal-body">
             <p style="font-size:0.88rem; color:var(--text-muted); margin-bottom:1rem; line-height:1.4;">
-                Current contract: <strong id="raise-current-bid" style="color:var(--gold-light);">10</strong> tricks.<br>
-                Propose a higher bid to opponents. If either opponent rejects your raise, your original bid is conceded as <strong>failed</strong> (opponents score those points!).
+                Current contract: <strong id="raise-current-bid" style="color:var(--gold-light);">10</strong> hands.<br>
+                Propose a higher bid to opponents. If opponents decline, you win immediately on your original contract! If they accept, play continues for the higher bid.
             </p>
             <div id="raise-bid-buttons" style="display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-bottom:1rem;"></div>
         </div>
@@ -1195,14 +1195,14 @@ html, body {
         </div>
         <div class="modal-body" style="text-align:center;">
             <p style="font-size:1.05rem; margin-bottom:0.75rem;">
-                Opponent wants to raise contract to <strong id="opponent-new-bid" style="color:var(--gold-light); font-size:1.25rem;">11</strong> tricks!
+                Opponent wants to raise contract to <strong id="opponent-new-bid" style="color:var(--gold-light); font-size:1.25rem;">11</strong> hands!
             </p>
             <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:1.5rem; line-height:1.4;">
-                Accept the higher bid to continue play, or reject to immediately claim a win on their original contract (<span id="opponent-old-bid">10</span> tricks)!
+                Accept the higher bid to continue play (if they fail, you win double!), or reject to concede their original bid (<span id="opponent-old-bid">10</span> hands) to them and proceed to the next round.
             </p>
             <div style="display:flex; flex-direction:column; gap:8px;">
                 <button id="btn-accept-raise" class="btn-primary" style="background:linear-gradient(135deg,#10b981,#059669);">✓ Accept <span id="lbl-accept-raise-bid">11</span> (Play continues)</button>
-                <button id="btn-reject-raise" class="btn-secondary" style="background:#dc2626; color:white; border-color:#b91c1c;">✕ Claim Win on <span id="lbl-reject-raise-bid">10</span> (You get points!)</button>
+                <button id="btn-reject-raise" class="btn-secondary" style="background:#dc2626; color:white; border-color:#b91c1c;">✕ Concede Original <span id="lbl-reject-raise-bid">10</span> (Next round)</button>
             </div>
         </div>
     </div>
@@ -1255,7 +1255,7 @@ html, body {
                 <thead>
                     <tr>
                         <th>#</th><th>Declarant</th><th>Bid</th>
-                        <th>Tricks</th><th>Made</th>
+                        <th>Hands</th><th>Made</th>
                         <th style="color:#93c5fd;">N/S</th>
                         <th style="color:#fca5a5;">W/E</th>
                     </tr>
@@ -1292,15 +1292,15 @@ html, body {
                 </ul>
             </div>
             <div class="rules-section">
-                <h3>Trump Selection</h3>
-                <p>The <strong>highest bidder (Declarant)</strong> wins and must lead the first card. <strong>That card's suit becomes trump</strong> for the entire hand.</p>
+                <h3>Rang Selection</h3>
+                <p>The <strong>highest bidder (Declarant)</strong> wins and must lead the first card. <strong>That card's suit becomes Rang</strong> for the entire hand.</p>
             </div>
             <div class="rules-section">
-                <h3>Playing Tricks</h3>
+                <h3>Playing Hands</h3>
                 <ul>
                     <li>Follow suit if you can. If void, play any card.</li>
-                    <li>Highest trump wins the trick, otherwise highest card of the led suit wins.</li>
-                    <li>Trick winner leads the next trick.</li>
+                    <li>Highest Rang card wins the hand, otherwise highest card of the led suit wins.</li>
+                    <li>Hand winner leads the next hand.</li>
                 </ul>
             </div>
             <div class="rules-section">
@@ -2708,25 +2708,25 @@ class TekkaGame {
         };
     }
 
-    // Mid-game bid raise rejected by defenders -> declarant team concedes failed contract
-    concedeFailedBid() {
-        const defTeam = 1 - this.declarantTeam;
-        let defPts = 0;
+    // Mid-game bid raise rejected by defenders -> defenders concede the original bid.
+    // The declarant team wins immediately with their original contract!
+    concedeOriginalBid() {
+        const decTeam = this.declarantTeam;
+        let decPts = 0;
         if (this.contractType === BID.BAWAND) {
-            defPts = 52;
+            decPts = 52;
         } else if (this.contractType === BID.LARIES || this.contractType === 'double13') {
-            defPts = 26;
+            decPts = 26;
         } else {
-            const num = Number(this.contractAmount);
-            defPts = (this.forcedEight && num === 8) ? 8 : (num * 2);
+            decPts = Number(this.contractAmount) || 8;
         }
 
-        this.teamScores[defTeam] += defPts;
+        this.teamScores[decTeam] += decPts;
         const roundResult = {
-            made: false,
+            made: true,
             declarantTeam: this.declarantTeam,
-            declarantPoints: 0,
-            defenderPoints: defPts,
+            declarantPoints: decPts,
+            defenderPoints: 0,
             tricksTaken: this.teamTricks[this.declarantTeam]
         };
 
@@ -2738,7 +2738,7 @@ class TekkaGame {
             contract: this.contractAmount,
             contractType: this.contractType,
             tricksTaken: this.teamTricks[this.declarantTeam],
-            made: false,
+            made: true,
             teamScores: [...this.teamScores]
         });
 
@@ -2748,13 +2748,16 @@ class TekkaGame {
         this.dealer = TekkaRules.ccwNext(this.dealer);
 
         return {
+            ok: true,
             roundEnd: true,
-            conceded: true,
-            roundResult,
-            teamScores: [...this.teamScores],
             gameOver,
-            winner: gameOver ? (this.teamScores[0] < this.teamScores[1] ? 0 : 1) : null
+            winner: gameOver ? (this.teamScores[0] >= TARGET_SCORE ? 0 : 1) : null,
+            roundResult
         };
+    }
+
+    concedeFailedBid() {
+        return this.concedeOriginalBid();
     }
 
     // Mid-game bid raise accepted by defenders -> update contract target
@@ -3821,7 +3824,7 @@ class TekkaUI {
         const bidLabel = this._formatBid(result.bid);
         const forcedMsg = result.forcedEight ? ' (everyone passed — forced bid)' : '';
 
-        this._updateStatusMsg(`${declarantName} wins bid: ${bidLabel}${forcedMsg}. Lead a card to set trump!`);
+        this._updateStatusMsg(`${declarantName} wins bid: ${bidLabel}${forcedMsg}. Lead a card to set Rang!`);
         this._hideBidOverlay();
         this._updateContractDisplay();
 
@@ -3834,12 +3837,12 @@ class TekkaUI {
             const isBotTurn = this.onlineMode ? (this.net.isHost && this.game.players[result.declarant].isBot) : (!this.game.players[result.declarant].isHuman);
 
             if (isMyTurn) {
-                this.showToast('🎴 You won the bid! Lead any card — that suit becomes TRUMP!', 4000);
+                this.showToast('🎴 You won the bid! Lead any card — that suit becomes RANG!', 4000);
                 this._enableHumanPlay();
             } else if (isBotTurn) {
                 setTimeout(() => this._doBotTrumpLead(result.declarant), this.botDelay);
             } else {
-                this.showToast(`${declarantName} is choosing trump...`, 2500);
+                this.showToast(`${declarantName} is choosing Rang...`, 2500);
                 this._disableHumanPlay();
             }
         }, 400);
@@ -4099,7 +4102,7 @@ class TekkaUI {
         raiseOptions.forEach(bid => {
             const btn = document.createElement('button');
             btn.className = 'bid-btn';
-            btn.textContent = `${bid} tricks`;
+            btn.textContent = `${bid} hands`;
             btn.style.margin = '4px';
             btn.addEventListener('click', () => {
                 this._closeModal('modal-raise-bid');
@@ -4117,20 +4120,22 @@ class TekkaUI {
             // Bot defenders decide whether to accept
             const defTeam = 1 - this.game.declarantTeam;
             const defTricks = this.game.teamTricks[defTeam];
-            const botAccepts = defTricks === 0 && Math.random() < 0.4;
+            const neededToDefeat = 14 - Number(newBid);
+            // Bots accept if they feel they have a good shot at stopping it for double points
+            const botAccepts = (defTricks >= neededToDefeat - 2) && Math.random() < 0.45;
             if (botAccepts) {
                 this.game.applyBidRaise(newBid);
                 this.game.highBid = newBid;
-                this.showToast(`✓ Opponents accepted raise to ${this._formatBid(newBid)}! Contract updated.`, 3500);
+                this.showToast(`✓ Opponents accepted raise to ${this._formatBid(newBid)} hands! Game continues.`, 3500);
                 this._updateContractDisplay();
             } else {
-                this.showToast(`✕ Opponents rejected the raise! Claimed win on ${this._formatBid(oldBid)}.`, 4000);
-                const result = this.game.concedeFailedBid();
+                this.showToast(`✕ Opponents declined raise! Conceded original ${this._formatBid(oldBid)} hands to you.`, 4000);
+                const result = this.game.concedeOriginalBid();
                 this._onRoundEnd(result);
             }
         } else {
             this.net.sendBidRaiseRequest(newBid);
-            this.showToast(`📨 Sent raise request to ${this._formatBid(newBid)} to opponents...`, 3000);
+            this.showToast(`📨 Sent raise request to ${this._formatBid(newBid)} hands to opponents...`, 3000);
         }
     }
 
@@ -4170,8 +4175,8 @@ class TekkaUI {
             }
             this.showToast('You accepted the higher bid challenge! Game continues.', 3000);
         } else {
-            this.showToast(`You claimed the win on ${this._formatBid(this.game.highBid)}! Points scored!`, 3500);
-            const result = this.game.concedeFailedBid();
+            this.showToast(`You declined the raise. Conceded ${this._formatBid(this.game.highBid)} hands to them.`, 3500);
+            const result = this.game.concedeOriginalBid();
             this._onRoundEnd(result);
         }
     }
@@ -4182,7 +4187,7 @@ class TekkaUI {
             ? Number(result.winner) : 0;
         const winnerName = this.game.players[wIdx]?.name || 'Player';
         const winnerTeam = TekkaRules.teamOf(wIdx) === 0 ? 'Team N/S' : 'Team W/E';
-        this._updateStatusMsg(`${winnerName} wins the trick! (${winnerTeam})`);
+        this._updateStatusMsg(`${winnerName} wins the hand! (${winnerTeam})`);
 
         // Update trick counts
         this._updateTrickCounts();
@@ -4414,12 +4419,12 @@ class TekkaUI {
     }
 
     _buildStatusText(nextPlayer, phase) {
-        if (phase === PHASE.TRUMP_LEAD) return `${this.game.players[nextPlayer].name}: Lead to set trump!`;
+        if (phase === PHASE.TRUMP_LEAD) return `${this.game.players[nextPlayer].name}: Lead to set Rang!`;
         const mySeat = this._getMySeat();
         const isHuman = this.onlineMode ? (nextPlayer === mySeat) : this.game.players[nextPlayer].isHuman;
         return isHuman
-            ? `Trick ${this.game.trickNumber}/13: Your turn to play!`
-            : `Trick ${this.game.trickNumber}/13: ${this.game.players[nextPlayer].name} playing...`;
+            ? `Hand ${this.game.trickNumber}/13: Your turn to play!`
+            : `Hand ${this.game.trickNumber}/13: ${this.game.players[nextPlayer].name} playing...`;
     }
 
     _updateStatusMsg(text) {
@@ -4469,7 +4474,7 @@ class TekkaUI {
         if (detailEl) {
             detailEl.innerHTML =
                 `${declarantName} bid <strong>${bidLabel}</strong> for Team ${teamLabel}<br>` +
-                `Tricks taken: <strong>${tricks}/13</strong><br>` +
+                `Hands taken: <strong>${tricks}/13</strong><br>` +
                 (made ? `Team ${teamLabel} scores <strong>+${pts}</strong> pts`
                       : `Opponents score <strong>+${pts}</strong> pts`);
         }
@@ -4811,10 +4816,10 @@ class TekkaUI {
                     this.game.highBid = this.pendingRaise.newBid;
                     this._updateContractDisplay();
                 }
-                this.showToast(`✓ Opponents accepted raise to ${this._formatBid(this.game.highBid)}! Target updated.`, 3500);
+                this.showToast(`✓ Opponents accepted raise to ${this._formatBid(this.game.highBid)} hands! Target updated.`, 3500);
             } else {
-                this.showToast(`✕ Opponents rejected raise! Conceded as failed.`, 4000);
-                const result = this.game.concedeFailedBid();
+                this.showToast(`✕ Opponents declined raise! Conceded original ${this._formatBid(this.game.highBid)} hands to you.`, 4000);
+                const result = this.game.concedeOriginalBid();
                 this._onRoundEnd(result);
             }
         };
