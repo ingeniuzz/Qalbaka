@@ -943,6 +943,7 @@ html, body {
             <span id="score-team-a" class="score-badge team-a">N/S: 0</span>
             <span id="score-team-b" class="score-badge team-b">W/E: 0</span>
             <button id="btn-raise-bid" class="btn-icon-sm hidden" title="Raise contract hands" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#000;font-weight:700;padding:2px 8px;font-size:0.75rem;border-radius:4px;border:none;cursor:pointer;">📈 Raise</button>
+            <button id="btn-surrender" class="btn-icon-sm hidden" title="Surrender hand" style="background:rgba(239,68,68,0.25);color:#fca5a5;border:1px solid rgba(239,68,68,0.5);font-weight:700;padding:2px 8px;font-size:0.75rem;border-radius:4px;cursor:pointer;">🏳️ Surrender</button>
         </div>
     </header>
 
@@ -1032,8 +1033,8 @@ html, body {
         </div>
         <div class="card-play-bar-buttons">
             <button id="btn-play-normal" class="play-action-btn primary" title="Play card normally">🃏 Speel</button>
-            <button id="btn-play-tapkey" class="play-action-btn tapkey" title="Speel dit soort weer">🔁 Tapkey</button>
-            <button id="btn-play-kaat" class="play-action-btn kaat" title="Ik heb dit soort niet meer">✂️ Kaat</button>
+            <button id="btn-play-tapkey" class="play-action-btn tapkey" title="Tapkey">🔁 Tapkey</button>
+            <button id="btn-play-kaat" class="play-action-btn kaat" title="Kaat">✂️ Kaat</button>
             <button id="btn-play-cancel" class="play-action-btn cancel" title="Kies andere kaart">✕</button>
         </div>
     </div>
@@ -1203,6 +1204,46 @@ html, body {
             <div style="display:flex; flex-direction:column; gap:8px;">
                 <button id="btn-accept-raise" class="btn-primary" style="background:linear-gradient(135deg,#10b981,#059669);">✓ Accept <span id="lbl-accept-raise-bid">11</span> (Play continues)</button>
                 <button id="btn-reject-raise" class="btn-secondary" style="background:#dc2626; color:white; border-color:#b91c1c;">✕ Concede Original <span id="lbl-reject-raise-bid">10</span> (Next round)</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Surrender Modal -->
+<div id="modal-surrender" class="modal-backdrop hidden">
+    <div class="modal-dialog">
+        <div class="modal-header">
+            <span class="modal-title">🏳️ Surrender Hand</span>
+            <button class="btn-close" data-close="modal-surrender">&times;</button>
+        </div>
+        <div class="modal-body" style="text-align:center;">
+            <p style="font-size:1.05rem; margin-bottom:0.75rem;">
+                Wil je deze hand opgeven (Surrender)?
+            </p>
+            <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:1.5rem; line-height:1.4;">
+                De tegenstanders winnen direct hun contract van <strong id="lbl-surrender-contract" style="color:var(--gold-light);">9</strong> hands (+<span id="lbl-surrender-pts">9</span> ptn). Je partner moet akkoord gaan. De volgende hand start daarna direct.
+            </p>
+            <div style="display:flex; flex-direction:column; gap:8px;">
+                <button id="btn-confirm-surrender" class="btn-primary" style="background:#dc2626; border-color:#b91c1c;">🏳️ Ja, Geef Hand Op</button>
+                <button class="btn-secondary" data-close="modal-surrender">Annuleren (Verder spelen)</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Partner Surrender Vote Modal -->
+<div id="modal-partner-surrender" class="modal-backdrop hidden">
+    <div class="modal-dialog">
+        <div class="modal-header">
+            <span class="modal-title">🏳️ Partner stelt Surrender voor</span>
+        </div>
+        <div class="modal-body" style="text-align:center;">
+            <p id="lbl-partner-surrender-text" style="font-size:0.95rem; margin-bottom:1.5rem; line-height:1.5;">
+                Je partner stelt voor om deze hand op te geven (Surrender).<br>Ga je akkoord met het toekennen van het contract aan de tegenstanders?
+            </p>
+            <div style="display:flex; flex-direction:column; gap:8px;">
+                <button id="btn-partner-surrender-agree" class="btn-primary" style="background:#dc2626; border-color:#b91c1c;">✓ Akkoord (Geef Op)</button>
+                <button id="btn-partner-surrender-decline" class="btn-secondary">✕ Weigeren (Speel Door)</button>
             </div>
         </div>
     </div>
@@ -2990,6 +3031,15 @@ class TekkaGame {
         return this.concedeOriginalBid();
     }
 
+    surrenderHand(surrenderingTeam) {
+        const res = this.concedeOriginalBid();
+        if (res && res.roundResult) {
+            res.roundResult.surrendered = true;
+            res.roundResult.surrenderingTeam = surrenderingTeam;
+        }
+        return res;
+    }
+
     // Mid-game bid raise accepted by defenders -> update contract target
     applyBidRaise(newBid) {
         if (newBid === BID.BAWAND) {
@@ -3334,6 +3384,35 @@ class TekkaNetwork {
         });
     }
 
+    sendSurrenderVoteRequest() {
+        this._publish('game', {
+            type: 'surrender_vote_request',
+            seat: this.mySeatIndex,
+            name: this.playerName,
+            ts: Date.now()
+        });
+    }
+
+    sendSurrenderVoteResponse(agree) {
+        this._publish('game', {
+            type: 'surrender_vote_response',
+            seat: this.mySeatIndex,
+            name: this.playerName,
+            agree,
+            ts: Date.now()
+        });
+    }
+
+    sendSurrenderConfirmed(surrenderingTeam) {
+        this._publish('game', {
+            type: 'surrender_confirmed',
+            seat: this.mySeatIndex,
+            name: this.playerName,
+            surrenderingTeam,
+            ts: Date.now()
+        });
+    }
+
     sendClaimSeat(seatIndex) {
         this._publish('lobby', {
             type: 'claim_seat',
@@ -3499,6 +3578,35 @@ class TekkaNetwork {
                 }
                 break;
 
+            case 'surrender_vote_request':
+                if (this.onSurrenderVoteRequest) {
+                    this.onSurrenderVoteRequest({
+                        seat: Number(msg.seat),
+                        name: msg.name
+                    });
+                }
+                break;
+
+            case 'surrender_vote_response':
+                if (this.onSurrenderVoteResponse) {
+                    this.onSurrenderVoteResponse({
+                        seat: Number(msg.seat),
+                        name: msg.name,
+                        agree: msg.agree
+                    });
+                }
+                break;
+
+            case 'surrender_confirmed':
+                if (this.onSurrenderConfirmed) {
+                    this.onSurrenderConfirmed({
+                        seat: Number(msg.seat),
+                        name: msg.name,
+                        surrenderingTeam: Number(msg.surrenderingTeam)
+                    });
+                }
+                break;
+
             case 'state':
                 if (msg.from !== this.mySeatIndex && this.onStateSync) {
                     this.onStateSync(msg.state);
@@ -3639,9 +3747,12 @@ class TekkaUI {
         this.elModalRaiseBid   = document.getElementById('modal-raise-bid');
         this.elModalRespondRaise = document.getElementById('modal-respond-raise');
 
-        // Card play action bar & raise button
+        // Card play action bar & raise / surrender buttons
         this.elActionBar       = document.getElementById('card-play-action-bar');
         this.elBtnRaise        = document.getElementById('btn-raise-bid');
+        this.elBtnSurrender    = document.getElementById('btn-surrender');
+        this.elModalSurrender  = document.getElementById('modal-surrender');
+        this.elModalPartnerSurrender = document.getElementById('modal-partner-surrender');
     }
 
     // -------------------------------------------------------------------------
@@ -3732,6 +3843,12 @@ class TekkaUI {
         document.getElementById('btn-accept-raise')?.addEventListener('click', () => this._respondToBidRaise(true));
         document.getElementById('btn-reject-raise')?.addEventListener('click', () => this._respondToBidRaise(false));
 
+        // Surrender triggers
+        this.elBtnSurrender?.addEventListener('click', () => this._openSurrenderModal());
+        document.getElementById('btn-confirm-surrender')?.addEventListener('click', () => this._confirmSurrender());
+        document.getElementById('btn-partner-surrender-agree')?.addEventListener('click', () => this._respondToPartnerSurrender(true));
+        document.getElementById('btn-partner-surrender-decline')?.addEventListener('click', () => this._respondToPartnerSurrender(false));
+
         // Card play action bar buttons (Speel / Tapkey / Kaat)
         document.getElementById('btn-play-normal')?.addEventListener('click', () => {
             if (this.selectedPlayCard) this._confirmPlayCard(this.selectedPlayCard, null);
@@ -3789,6 +3906,8 @@ class TekkaUI {
         this.selectedCard = null;
         this.selectedPlayCard = null;
         this.legalCardIds.clear();
+        this.elBtnRaise?.classList.add('hidden');
+        this.elBtnSurrender?.classList.add('hidden');
         this.elTrickArea.innerHTML = '';
         this.elTrumpSuit.textContent = '—';
         this.elTrumpIcon.textContent = '';
@@ -4139,10 +4258,10 @@ class TekkaUI {
 
             if (bid === BID.PASS || bid === 'pass') {
                 cls += ' bid-pass';
-                label = 'Pass (1-3)';
+                label = 'Pass';
             } else if (bid === BID.TEER || bid === 'teer') {
                 cls += ' bid-teer';
-                label = 'Teer (0-1)';
+                label = 'Teer';
             } else if (bid === BID.BAWAND || bid === 'bawand') {
                 cls += ' bid-bawand';
             } else if (bid === BID.LARIES || bid === 'laries' || bid === 'double13' || bid === BID.DOUBLE13) {
@@ -4287,6 +4406,7 @@ class TekkaUI {
         const isBotTurn = this.onlineMode ? (this.net.isHost && this.game.players[nextPlayer].isBot) : (!this.game.players[nextPlayer].isHuman);
 
         this._updateRaiseBidButton();
+        this._updateSurrenderButton();
 
         if (isMyTurn) {
             this._enableHumanPlay();
@@ -4342,6 +4462,93 @@ class TekkaUI {
             this.game.contractType !== BID.LARIES
         );
         this.elBtnRaise.classList.toggle('hidden', !canRaise);
+    }
+
+    _updateSurrenderButton() {
+        if (!this.elBtnSurrender) return;
+        const mySeat = this._getMySeat();
+        const myTeam = TekkaRules.teamOf(mySeat);
+        const canSurrender = (
+            this.game.phase === PHASE.PLAYING &&
+            this.game.declarantTeam !== null &&
+            this.game.declarantTeam !== myTeam
+        );
+        this.elBtnSurrender.classList.toggle('hidden', !canSurrender);
+    }
+
+    _openSurrenderModal() {
+        const contract = this.game.highBid || this.game.contractAmount || 9;
+        const contractStr = this._formatBid(contract);
+        let pts = 0;
+        if (this.game.contractType === BID.BAWAND) pts = 52;
+        else if (this.game.contractType === BID.LARIES || this.game.contractType === 'double13') pts = 26;
+        else pts = Number(contract) || 9;
+
+        const lblContract = document.getElementById('lbl-surrender-contract');
+        const lblPts = document.getElementById('lbl-surrender-pts');
+        if (lblContract) lblContract.textContent = contractStr;
+        if (lblPts) lblPts.textContent = pts;
+
+        this._openModal('modal-surrender');
+    }
+
+    _confirmSurrender() {
+        this._closeModal('modal-surrender');
+        const mySeat = this._getMySeat();
+        const myTeam = TekkaRules.teamOf(mySeat);
+        const partnerSeat = (mySeat + 2) % 4;
+
+        if (!this.onlineMode) {
+            // Single player: Partner bot automatically agrees
+            this.showToast('🏳️ Partner stemt in met opgeven. Hand beëindigd.', 3500);
+            const result = this.game.surrenderHand(myTeam);
+            this._onRoundEnd(result);
+        } else {
+            // Online mode
+            const partnerInfo = this.net.players && this.net.players[partnerSeat];
+            const isPartnerHuman = partnerInfo && partnerInfo.connected;
+
+            if (isPartnerHuman) {
+                this.net.sendSurrenderVoteRequest();
+                this.showToast('📨 Voorstel om op te geven verzonden. Wachten op akkoord van partner...', 3500);
+            } else {
+                // Partner is a bot -> auto-agree
+                this.showToast('🏳️ Partner stemt in met opgeven. Hand beëindigd.', 3500);
+                this.net.sendSurrenderConfirmed(myTeam);
+                const result = this.game.surrenderHand(myTeam);
+                this._onRoundEnd(result);
+            }
+        }
+    }
+
+    _onReceiveSurrenderVoteRequest(data) {
+        const mySeat = this._getMySeat();
+        const partnerSeat = (mySeat + 2) % 4;
+        if (Number(data.seat) !== partnerSeat) return;
+
+        const pName = data.name || this.game.players[data.seat]?.name || 'Je partner';
+        const modalText = document.getElementById('lbl-partner-surrender-text');
+        if (modalText) {
+            modalText.innerHTML = `<strong>${pName}</strong> stelt voor om deze hand op te geven (Surrender).<br>Gaan jullie akkoord met het toekennen van het contract aan de tegenstanders?`;
+        }
+        this._openModal('modal-partner-surrender');
+    }
+
+    _respondToPartnerSurrender(agree) {
+        this._closeModal('modal-partner-surrender');
+        const mySeat = this._getMySeat();
+        const myTeam = TekkaRules.teamOf(mySeat);
+
+        if (this.onlineMode) {
+            this.net.sendSurrenderVoteResponse(agree);
+            if (agree) {
+                this.net.sendSurrenderConfirmed(myTeam);
+                const result = this.game.surrenderHand(myTeam);
+                this._onRoundEnd(result);
+            } else {
+                this.showToast('Je hebt het opgeven geweigerd. Het spel gaat door!', 3000);
+            }
+        }
     }
 
     _openRaiseBidModal() {
@@ -4476,6 +4683,8 @@ class TekkaUI {
     }
 
     _onRoundEnd(result) {
+        this.elBtnRaise?.classList.add('hidden');
+        this.elBtnSurrender?.classList.add('hidden');
         const rr = result.roundResult;
         this._updateScoreDisplay();
         this._showRoundEndModal(rr, result);
@@ -4597,16 +4806,15 @@ class TekkaUI {
     showAnnouncement(seatIndex, type) {
         const zone = this.elPlayers[seatIndex];
         if (!zone) return;
-        const text = type === 'tapkey' ? '🔁 Tapkey!' : '✂️ Kaat!';
-        const meaning = type === 'tapkey' ? '(Speel weer)' : '(Heb niet meer)';
+        const text = type === 'tapkey' ? '🔁 Tapkey' : '✂️ Kaat';
         const bubble = document.createElement('div');
         bubble.className = 'player-announcement-bubble';
-        bubble.textContent = `${text} ${meaning}`;
+        bubble.textContent = text;
         zone.appendChild(bubble);
         setTimeout(() => bubble.remove(), 3500);
 
         const pName = this.game.players[seatIndex].name;
-        this.showToast(`💬 ${pName}: "${text}" ${meaning}`, 3000);
+        this.showToast(`💬 ${pName}: ${text}`, 3000);
     }
 
     _renderBotHand(seatIndex, hand) {
@@ -4732,6 +4940,7 @@ class TekkaUI {
             : '';
         const bidLabel = this._formatBid(this.game.contractAmount);
         const made = rr ? !!rr.made : false;
+        const surrendered = rr ? !!rr.surrendered : false;
         const teamLabel = this.game.declarantTeam === 0 ? 'N/S' : 'W/E';
         const pts = rr ? (made ? (rr.declarantPoints || 0) : (rr.defenderPoints || 0)) : 0;
         const tricks = rr ? (rr.tricksTaken !== undefined ? rr.tricksTaken : 0) : 0;
@@ -4745,7 +4954,13 @@ class TekkaUI {
         const titleEl = document.getElementById('round-result-title');
         if (titleEl) {
             titleEl.className = 'round-result-title ' + (didMyTeamWin ? 'made' : 'failed');
-            if (didMyTeamWin) {
+            if (surrendered) {
+                if (didMyTeamWin) {
+                    titleEl.textContent = `🎉 Tegenstander heeft opgegeven! (+${pts} pts)`;
+                } else {
+                    titleEl.textContent = `🏳️ Hand Opgegeven (Tegenstanders +${pts} pts)`;
+                }
+            } else if (didMyTeamWin) {
                 if (isMyTeamDeclarant) {
                     titleEl.textContent = `🎉 Bid Made! (+${pts} pts)`;
                 } else {
@@ -4764,10 +4979,17 @@ class TekkaUI {
         if (detailEl) {
             const scoringTeamName = didMyTeamWin ? 'Your team' : 'Opponents';
             const color = didMyTeamWin ? '#4ade80' : '#f87171';
-            detailEl.innerHTML =
-                `${declarantName} bid <strong>${bidLabel}</strong> for Team ${teamLabel}<br>` +
-                `Hands taken: <strong>${tricks}/13</strong><br>` +
-                `<span style="color:${color};font-weight:800;font-size:1.05rem;">${scoringTeamName} score +${pts} pts!</span>`;
+            if (surrendered) {
+                detailEl.innerHTML =
+                    `De verdediging heeft de hand opgegeven (Surrender).<br>` +
+                    `Contract <strong>${bidLabel}</strong> hands toegekend aan Team ${teamLabel}.<br>` +
+                    `<span style="color:${color};font-weight:800;font-size:1.05rem;">${scoringTeamName} score +${pts} pts!</span>`;
+            } else {
+                detailEl.innerHTML =
+                    `${declarantName} bid <strong>${bidLabel}</strong> for Team ${teamLabel}<br>` +
+                    `Hands taken: <strong>${tricks}/13</strong><br>` +
+                    `<span style="color:${color};font-weight:800;font-size:1.05rem;">${scoringTeamName} score +${pts} pts!</span>`;
+            }
         }
 
         const scoresEl = document.getElementById('round-scores');
@@ -5118,6 +5340,25 @@ class TekkaUI {
                 const result = this.game.concedeOriginalBid();
                 this._onRoundEnd(result);
             }
+        };
+
+        this.net.onSurrenderVoteRequest = (data) => {
+            this._onReceiveSurrenderVoteRequest(data);
+        };
+
+        this.net.onSurrenderVoteResponse = (data) => {
+            if (!data.agree) {
+                this.showToast('✕ Partner weigert op te geven en wil doorspelen!', 3500);
+            }
+        };
+
+        this.net.onSurrenderConfirmed = (data) => {
+            this._closeModal('modal-surrender');
+            this._closeModal('modal-partner-surrender');
+            const teamLabel = Number(data.surrenderingTeam) === 0 ? 'Team N/S' : 'Team W/E';
+            this.showToast(`🏳️ ${teamLabel} heeft opgegeven.`, 3500);
+            const result = this.game.surrenderHand(Number(data.surrenderingTeam));
+            this._onRoundEnd(result);
         };
 
         this.net.onConnectionChange = (connected, host) => {
