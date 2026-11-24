@@ -1954,6 +1954,14 @@ const TekkaRules = {
         return !hand.some(c => c.isHonor);
     },
 
+    // Sort hand by suit and rank (wrapper around sortHand)
+    sortHand(hand, trump = null) {
+        if (typeof sortHand === 'function') {
+            return sortHand(hand, trump);
+        }
+        return hand;
+    },
+
     // Count hand strength (for AI and display)
     handStrength(hand) {
         let pts = 0;
@@ -2653,14 +2661,18 @@ class TekkaGame {
             for (let i = 0; i < 4; i++) {
                 const targetSeat = this.biddingOrder[i];
                 const packet = deckCards.slice(i * 13, (i + 1) * 13);
-                this.hands[targetSeat] = TekkaRules.sortHand(packet.map(c => new Card(c.suit, c.rank)));
+                this.hands[targetSeat] = (typeof sortHand === 'function')
+                    ? sortHand(packet.map(c => new Card(c.suit, c.rank)))
+                    : packet.map(c => new Card(c.suit, c.rank));
             }
         } else {
             // Random Cut / Fresh full shuffle:
             const deck = new Deck();
             deck.shuffle();
             const rawHands = deck.deal(4);
-            this.hands = rawHands.map(h => TekkaRules.sortHand(h));
+            this.hands = (typeof sortHand === 'function')
+                ? rawHands.map(h => sortHand(h))
+                : rawHands;
             this.lastCutInfo = {
                 mode: 'random'
             };
