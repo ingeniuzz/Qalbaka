@@ -516,21 +516,21 @@ html, body {
 /* ====================== TOAST ====================== */
 #toast {
   position: fixed;
-  bottom: 150px;
+  top: 68px;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(10,25,15,0.95);
+  background: rgba(10,25,15,0.96);
   color: var(--gold-light);
   border: 1px solid var(--gold);
   border-radius: 20px;
   padding: 0.5rem 1.2rem;
-  font-size: 0.85rem;
+  font-size: 0.88rem;
   font-weight: 700;
   z-index: 999;
   max-width: 90%;
   text-align: center;
   pointer-events: none;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  box-shadow: 0 6px 24px rgba(0,0,0,0.6);
 }
 
 /* ====================== MODALS ====================== */
@@ -753,7 +753,7 @@ html, body {
 /* Speech bubbles for Tapkey / Kaat announcements */
 .player-announcement-bubble {
   position: absolute;
-  top: -32px;
+  top: -36px;
   left: 50%;
   transform: translateX(-50%);
   background: #f59e0b;
@@ -767,6 +767,28 @@ html, body {
   z-index: 100;
   pointer-events: none;
   animation: popInBounce 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.pos-south .player-announcement-bubble {
+  top: -46px; /* Higher above player badge so name is never obscured */
+  left: 50%;
+  transform: translateX(-50%);
+}
+.pos-north .player-announcement-bubble {
+  top: auto;
+  bottom: -36px; /* Positioned below north player badge into table area */
+  left: 50%;
+  transform: translateX(-50%);
+}
+.pos-west .player-announcement-bubble {
+  left: calc(100% + 10px); /* Beside West bot badge */
+  top: 50%;
+  transform: translateY(-50%);
+}
+.pos-east .player-announcement-bubble {
+  left: auto;
+  right: calc(100% + 10px); /* Beside East bot badge */
+  top: 50%;
+  transform: translateY(-50%);
 }
 @keyframes popInBounce {
   0% { opacity: 0; transform: translateX(-50%) scale(0.6); }
@@ -2455,7 +2477,7 @@ class TekkaAI {
 
         if (isLeading) {
             return this._chooseLeadCard({
-                legal, hand, trump, botIndex, isDeclarantTeam,
+                legal, hand, trump, botIndex, partnerSeat, isDeclarantTeam,
                 partnerTapkeySuits, partnerKaatSuits, partnerHasRang,
                 myTrumps, remainingTrumpsOutside, opponentsRangCount,
                 gameState, difficulty
@@ -2471,13 +2493,15 @@ class TekkaAI {
     // --- LEADING STRATEGY ---
     static _chooseLeadCard(ctx) {
         const {
-            legal, trump, isDeclarantTeam,
+            legal, trump, isDeclarantTeam, partnerSeat,
             partnerTapkeySuits, partnerKaatSuits, partnerHasRang,
-            myTrumps, opponentsRangCount
+            myTrumps, remainingTrumpsOutside, opponentsRangCount,
+            gameState
         } = ctx;
 
         const legalTrumps = legal.filter(c => c.suit === trump);
         const hasLegalTrumps = legalTrumps.length > 0;
+        const nonTrumpLegal = legal.filter(c => c.suit !== trump);
 
         // BAWAND PARTNER ON LEAD:
         // Partner of Bawand declarant must never win tricks, lead lowest non-trump card to give lead back to declarant!
@@ -2488,24 +2512,71 @@ class TekkaAI {
             ctx.botIndex !== ctx.gameState.declarant
         );
         if (isBawandPartnerLead) {
-            const nonTrump = legal.filter(c => c.suit !== trump);
-            if (nonTrump.length > 0) {
-                return this._lowestCard(nonTrump);
+            if (nonTrumpLegal.length > 0) {
+                return this._lowestCard(nonTrumpLegal);
             }
             return this._lowestCard(legal);
         }
 
-        // USER RULE 1:
-        // "wanneer je rang speelt, en de tegenstander heeft geen rang, dan is het niet slim
-        // om rang te blijven spelen, want die van jou en je vriend raak je in 1 hand 2 rang kwijt,
-        // terwijl je dat kan gebruiken om andere kaarten ermee te winnen dan heb je niet 1 hand extra, maar 2."
-        // -> If opponents have 0 Rang, NEVER lead Rang!
+        // -------------------------------------------------------------
+        // USER RULE: OPPONENTS (OR EVERYONE ELSE) HAVE NO MORE RANG!
+        // "wanneer de bot rang heeft, en ziet dat de rest geen rang meer heeft, blijft het spelen,
+        // en op een gegeven moment heeft hij zelf ook geen rang meer en kan hij handen niet meer pakken.
+        // dus zodra je ziet dat niemand meer rang heeft, is het slimmer om mijn tapkey te komen,
+        // of als ik iets teer hebben gegeven die soort te vermijden te spelen."
+        // -------------------------------------------------------------
+        const nobodyElseHasRang = (remainingTrumpsOutside === 0) || (opponentsRangCount === 0 && !partnerHasRang);
+        const noOpponentsHaveRang = (opponentsRangCount === 0);
+
+        if (hasLegalTrumps && (nobodyElseHasRang || noOpponentsHaveRang) && nonTrumpLegal.length > 0) {
+            // A. Partner's Tapkey: if partner signaled Tapkey, lead low card in partner's Tapkey suit!
+            for (const tSuit of partnerTapkeySuits) {
+                const tapkeyCards = nonTrumpLegal.filter(c => c.suit === tSuit);
+                if (tapkeyCards.length > 0) {
+                    tapkeyCards.sort((a, b) => a.value - b.value);
+                    return tapkeyCards[0];
+                }
+            }
+
+            // B. If partner still has Rang (and opponents have 0), lead partner's Kaat suit so partner can ruff!
+            if (partnerHasRang && !nobodyElseHasRang) {
+                for (const kSuit of partnerKaatSuits) {
+                    const cardsInSuit = nonTrumpLegal.filter(c => c.suit === kSuit);
+                    if (cardsInSuit.length > 0) {
+                        const topCard = cardsInSuit.reduce((best, c) => c.value > best.value ? c : best, cardsInSuit[0]);
+                        if (topCard.value === 14) return topCard;
+                        cardsInSuit.sort((a, b) => a.value - b.value);
+                        return cardsInSuit[0];
+                    }
+                }
+            }
+
+            // C. Partner void/Kaat suits to AVOID (partner has no cards in this suit):
+            const partnerAvoidSuits = new Set([
+                ...(partnerKaatSuits || []),
+                ...(gameState?.voidSuits?.[partnerSeat] || [])
+            ]);
+
+            // D. Cash bot's own side Aces (guaranteed trick winners)
+            const sideAces = nonTrumpLegal.filter(c => c.value === 14);
+            if (sideAces.length > 0) {
+                return sideAces[0];
+            }
+
+            // E. Lead from a safe side suit where partner is NOT void/Kaat
+            const safeNonTrump = nonTrumpLegal.filter(c => !partnerAvoidSuits.has(c.suit));
+            if (safeNonTrump.length > 0) {
+                safeNonTrump.sort((a, b) => b.value - a.value);
+                return safeNonTrump[0];
+            }
+
+            // F. Fallback: lead lowest non-trump card (still keep trumps in reserve!)
+            return this._lowestCard(nonTrumpLegal);
+        }
 
         // USER RULE 2:
         // "maar stel de bot ziet dat ik geen rang kaarten heb, en de tegenstanders wel,
         // dan is het slim om altijd rang te spelen zodat de tegenstander die van hun kwijt raakt."
-        // "maar stel ik heb geen rang en de bot partner wel, en de 2 tegenstanders ook,
-        // dan moet de bot altijd rang spelen om zo 2 van hun kwijt te raken (wij verliezen maar 1)."
         if (hasLegalTrumps && !partnerHasRang && opponentsRangCount >= 1) {
             legalTrumps.sort((a, b) => b.value - a.value);
             return legalTrumps[0]; // Lead highest Rang to bleed opponents
@@ -2562,12 +2633,19 @@ class TekkaAI {
             return nonTrumpAces[0];
         }
 
-        // If safe side suit exists, lead highest card in non-trump
-        const nonTrump = legal.filter(c => c.suit !== trump);
-        if (nonTrump.length > 0) {
-            // If opponents have 0 Rang, definitely prefer leading side suits!
-            nonTrump.sort((a, b) => b.value - a.value);
-            return nonTrump[0];
+        // If safe side suit exists, lead highest card in non-trump, avoiding partner's void suits
+        if (nonTrumpLegal.length > 0) {
+            const partnerAvoidSuits = new Set([
+                ...(partnerKaatSuits || []),
+                ...(gameState?.voidSuits?.[partnerSeat] || [])
+            ]);
+            const safeSuits = nonTrumpLegal.filter(c => !partnerAvoidSuits.has(c.suit));
+            if (safeSuits.length > 0) {
+                safeSuits.sort((a, b) => b.value - a.value);
+                return safeSuits[0];
+            }
+            nonTrumpLegal.sort((a, b) => b.value - a.value);
+            return nonTrumpLegal[0];
         }
 
         // Default fallback
@@ -4648,6 +4726,9 @@ class TekkaUI {
 
         // Update player badge to show bid
         this._showPlayerBid(seatIndex, bid);
+        if (bid === BID.TEER || bid === 'teer') {
+            this.showAnnouncement(seatIndex, 'teer');
+        }
 
         // After processing a bid online (host only), broadcast the full updated state to guest
         if (this.onlineMode && this.net && this.net.isHost) {
@@ -4927,7 +5008,7 @@ class TekkaUI {
             this.game.phase === PHASE.PLAYING &&
             isDeclarantTeam &&
             !isNaN(curBidNum) &&
-            curBidNum < Math.min(12, maxPossible) &&
+            curBidNum < Math.min(13, maxPossible) &&
             this.game.contractType !== BID.BAWAND &&
             this.game.contractType !== BID.LARIES
         );
@@ -5056,9 +5137,9 @@ class TekkaUI {
         if (!container) return;
         container.innerHTML = '';
 
-        // Only numeric bids between curBidNum + 1 and maxPossible, capped at 12
+        // Only numeric bids between curBidNum + 1 and maxPossible, up to 13
         const raiseOptions = [];
-        for (let b = curBidNum + 1; b <= Math.min(12, maxPossible); b++) {
+        for (let b = curBidNum + 1; b <= Math.min(13, maxPossible); b++) {
             raiseOptions.push(b);
         }
 
@@ -5285,7 +5366,9 @@ class TekkaUI {
     showAnnouncement(seatIndex, type) {
         const zone = this.elPlayers[seatIndex];
         if (!zone) return;
-        const text = type === 'tapkey' ? '🔁 Tapkey' : '✂️ Kaat';
+        let text = '✂️ Kaat';
+        if (type === 'tapkey') text = '🔁 Tapkey';
+        else if (type === 'teer') text = '🚫 Teer';
         const bubble = document.createElement('div');
         bubble.className = 'player-announcement-bubble';
         bubble.textContent = text;
