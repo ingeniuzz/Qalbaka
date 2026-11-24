@@ -1768,6 +1768,36 @@ const TekkaRules = {
         return legal;
     },
 
+    // Opening lead to choose Rang:
+    // Rule: Ace of Rang is required, but if you hold consecutive honors from Ace down
+    // (e.g. A-K, A-K-Q, A-K-Q-J, A-K-Q-J-10), you may play any card in that unbroken sequence!
+    legalTrumpLeads(hand) {
+        if (!hand || hand.length === 0) return [];
+        const legal = [];
+
+        for (const suit of SUITS) {
+            const suitCards = hand.filter(c => c.suit === suit);
+            // Must hold the Ace (value 14)
+            const hasAce = suitCards.some(c => c.value === 14);
+            if (!hasAce) continue;
+
+            // Find unbroken sequence from Ace (14) down
+            let val = 14;
+            while (val >= 2) {
+                const card = suitCards.find(c => c.value === val);
+                if (card) {
+                    legal.push(card);
+                    val--;
+                } else {
+                    break;
+                }
+            }
+        }
+
+        // Fallback to all cards if no Ace in hand
+        return legal.length > 0 ? legal : [...hand];
+    },
+
     // Determine which cards are legal to play
     legalCards(hand, trick, trump) {
         if (!trick || trick.length === 0) {
@@ -2087,14 +2117,51 @@ class TekkaAI {
     // TRUMP SELECTION (declarant leading first card)
     // -------------------------------------------------------------------------
 
+    /**
+     * Opening lead to set Rang:
+     * Ace of Rang is required, but if holding unbroken top honors starting from Ace
+     * (e.g. A-K, A-K-Q, A-K-Q-J, A-K-Q-J-10), lead the lowest card of that sequence
+     * (e.g. J with A-K-Q-J), signaling all higher honors to partner!
+     */
     static chooseTrumpLead(hand, difficulty = 'hard') {
         const { suitLengths } = TekkaRules.handStrength(hand);
-        const { bestSuit } = this._evaluateBestSuitAndTricks(hand, suitLengths);
-        const trumpCards = hand.filter(c => c.suit === bestSuit);
 
-        // Lead highest trump card to reveal trump and establish dominance
-        trumpCards.sort((a, b) => b.value - a.value);
-        return trumpCards[0] || hand[0];
+        // Find suits where bot holds the Ace (required for Rang opening lead)
+        const suitsWithAce = SUITS.filter(s => hand.some(c => c.suit === s && c.value === 14));
+
+        let chosenSuit = null;
+        if (suitsWithAce.length > 0) {
+            // Pick suit with Ace that has the best score (longest + most honors)
+            let bestScore = -1;
+            for (const s of suitsWithAce) {
+                const sCards = hand.filter(c => c.suit === s);
+                const score = sCards.length * 3 + sCards.filter(c => c.value >= 10).length * 2;
+                if (score > bestScore) {
+                    bestScore = score;
+                    chosenSuit = s;
+                }
+            }
+        } else {
+            const { bestSuit } = this._evaluateBestSuitAndTricks(hand, suitLengths);
+            chosenSuit = bestSuit;
+        }
+
+        const suitCards = hand.filter(c => c.suit === chosenSuit);
+
+        // Find the unbroken top sequence from Ace (14) down
+        let lowestSeqCard = suitCards.find(c => c.value === 14) || suitCards[0];
+        let val = 14;
+        while (val >= 2) {
+            const card = suitCards.find(c => c.value === val);
+            if (card) {
+                lowestSeqCard = card;
+                val--;
+            } else {
+                break;
+            }
+        }
+
+        return lowestSeqCard;
     }
 
     // -------------------------------------------------------------------------
@@ -2103,13 +2170,31 @@ class TekkaAI {
 
     /**
      * Decide if bot should announce 'tapkey' or 'kaat' when playing a card.
+     * - Opening Rang lead response: If partner led J with A-K-Q, and bot has 10,
+     *   bot announces Tapkey ("hey ik heb de 10!").
      * - Kaat: playing the last card of suit S (now void in S).
      * - Tapkey: playing a lower card in suit S while still holding a high card (A/K/Q) in S.
      */
     static decideAnnouncement(hand, card, trick, trump, botIndex, gameState) {
         if (!card) return null;
         const suit = card.suit;
-        if (suit === trump) return null; // Announcements are on side suits
+        const partnerSeat = TekkaRules.partnerOf(botIndex);
+
+        // Check opening Rang lead signaling from partner
+        if (gameState && gameState.openingTrumpLeadCard && trick && trick.length > 0) {
+            const leadEntry = trick[0];
+            if (leadEntry && leadEntry.playerIndex === partnerSeat && leadEntry.card.suit === trump) {
+                // Partner made opening lead in trump.
+                // If bot holds the card with value (openingLead.value - 1) in trump, announce Tapkey!
+                const openingVal = leadEntry.card.value;
+                const nextConsecutiveInTrump = hand.some(c => c.suit === trump && c.value === (openingVal - 1));
+                if (nextConsecutiveInTrump) {
+                    return 'tapkey';
+                }
+            }
+        }
+
+        if (suit === trump) return null; // Normal Tapkey/Kaat announcements are on side suits
 
         const remainingInSuit = hand.filter(c => (c.id !== card.id) && c.suit === suit);
 
@@ -2149,19 +2234,40 @@ class TekkaAI {
         const partnerKaatSuits = partnerAnnouncements?.kaat || [];
         const partnerVoidInTrump = !!(gameState.voidSuits?.[partnerSeat]?.includes(trump));
 
-        // Trumps tracking
+        // Trumps tracking for all players
         const allPlayed = gameState.allPlayedCards || [];
         const trumpsPlayedCount = allPlayed.filter(c => c.suit === trump).length +
             (trick ? trick.filter(e => e.card.suit === trump).length : 0);
         const myTrumps = hand.filter(c => c.suit === trump);
-        const remainingTrumpsOutside = 13 - myTrumps.length - trumpsPlayedCount;
-        const opponentsHaveTrumps = (remainingTrumpsOutside > 0);
+        const remainingTrumpsOutside = Math.max(0, 13 - myTrumps.length - trumpsPlayedCount);
+
+        const op1 = TekkaRules.ccwNext(botIndex);
+        const op2 = (botIndex + 1) % 4;
+        const op1VoidInTrump = !!(gameState.voidSuits?.[op1]?.includes(trump));
+        const op2VoidInTrump = !!(gameState.voidSuits?.[op2]?.includes(trump));
+
+        // Determine if partner has Rang
+        const partnerHasRang = !partnerVoidInTrump && (remainingTrumpsOutside > 0);
+
+        // Determine how many opponents have Rang
+        let opponentsRangCount = 0;
+        if (remainingTrumpsOutside > 0) {
+            if (op1VoidInTrump && op2VoidInTrump) {
+                opponentsRangCount = 0;
+            } else if (op1VoidInTrump || op2VoidInTrump) {
+                opponentsRangCount = 1;
+            } else {
+                // Neither opponent shown void
+                opponentsRangCount = (remainingTrumpsOutside >= 2) ? 2 : 1;
+            }
+        }
 
         if (isLeading) {
             return this._chooseLeadCard({
                 legal, hand, trump, botIndex, isDeclarantTeam,
-                partnerTapkeySuits, partnerKaatSuits, partnerVoidInTrump,
-                myTrumps, opponentsHaveTrumps, gameState, difficulty
+                partnerTapkeySuits, partnerKaatSuits, partnerHasRang,
+                myTrumps, remainingTrumpsOutside, opponentsRangCount,
+                gameState, difficulty
             });
         } else {
             return this._chooseFollowCard({
@@ -2175,36 +2281,38 @@ class TekkaAI {
     static _chooseLeadCard(ctx) {
         const {
             legal, trump, isDeclarantTeam,
-            partnerTapkeySuits, partnerKaatSuits, partnerVoidInTrump,
-            myTrumps, opponentsHaveTrumps
+            partnerTapkeySuits, partnerKaatSuits, partnerHasRang,
+            myTrumps, opponentsRangCount
         } = ctx;
 
-        // 1. TRUMP PULLING:
-        // When bot is declarant (or has trump control) and opponents still hold trumps,
-        // lead highest trump to pull opponents' trumps.
-        if (isDeclarantTeam && opponentsHaveTrumps && myTrumps.length > 0) {
-            const legalTrumps = legal.filter(c => c.suit === trump);
-            if (legalTrumps.length > 0) {
-                legalTrumps.sort((a, b) => b.value - a.value);
-                return legalTrumps[0];
-            }
+        const legalTrumps = legal.filter(c => c.suit === trump);
+        const hasLegalTrumps = legalTrumps.length > 0;
+
+        // USER RULE 1:
+        // "wanneer je rang speelt, en de tegenstander heeft geen rang, dan is het niet slim
+        // om rang te blijven spelen, want die van jou en je vriend raak je in 1 hand 2 rang kwijt,
+        // terwijl je dat kan gebruiken om andere kaarten ermee te winnen dan heb je niet 1 hand extra, maar 2."
+        // -> If opponents have 0 Rang, NEVER lead Rang!
+
+        // USER RULE 2:
+        // "maar stel de bot ziet dat ik geen rang kaarten heb, en de tegenstanders wel,
+        // dan is het slim om altijd rang te spelen zodat de tegenstander die van hun kwijt raakt."
+        // "maar stel ik heb geen rang en de bot partner wel, en de 2 tegenstanders ook,
+        // dan moet de bot altijd rang spelen om zo 2 van hun kwijt te raken (wij verliezen maar 1)."
+        if (hasLegalTrumps && !partnerHasRang && opponentsRangCount >= 1) {
+            legalTrumps.sort((a, b) => b.value - a.value);
+            return legalTrumps[0]; // Lead highest Rang to bleed opponents
         }
 
-        // 2. PARTNER'S TAPKEY SUIT:
-        // Partner asked "kom weer" with a high card. Lead suit S so partner can win!
-        for (const tSuit of partnerTapkeySuits) {
-            const cardsInSuit = legal.filter(c => c.suit === tSuit);
-            if (cardsInSuit.length > 0) {
-                // Lead lowest card in that suit to let partner's high card take the trick
-                cardsInSuit.sort((a, b) => a.value - b.value);
-                return cardsInSuit[0];
-            }
-        }
+        // USER RULE 3:
+        // "stel 1 tegenstander heeft rang, en ik en mijn bot partner hebben rang,
+        // en dan moet de bot geen rang spelen, want zo verliezen wij 2 rang en zij maar 1."
+        // -> When partner has Rang and opponentsRangCount === 1, DO NOT lead Rang!
 
-        // 3. PARTNER'S KAAT SUIT:
-        // Partner has no more cards in suit K and can trump it!
-        // User rule: "tenzij hij zelf de hoge van die kaart heeft, dan wel"
-        if (!partnerVoidInTrump) {
+        // USER RULE 4:
+        // "stel de bot weet ik heb nog rang kaarten, en ik geeft een van de suits een kaat,
+        // dan is het slim dat de bot dat komt zodat ik mijn rang kaart kan spelen en de hand winnen."
+        if (partnerHasRang) {
             for (const kSuit of partnerKaatSuits) {
                 const cardsInSuit = legal.filter(c => c.suit === kSuit);
                 if (cardsInSuit.length > 0) {
@@ -2213,35 +2321,52 @@ class TekkaAI {
                     if (topCard.value === 14) {
                         return topCard;
                     }
-                    // Otherwise lead a low card so partner can ruff/cut it with trump!
+                    // Otherwise lead a low card so partner can ruff/cut it with Rang!
                     cardsInSuit.sort((a, b) => a.value - b.value);
                     return cardsInSuit[0];
                 }
             }
         }
 
-        // 4. CASH OUTSIDE WINNERS (Aces or master cards)
+        // PARTNER'S TAPKEY SUIT:
+        // Partner signaled Tapkey ("kom weer") in suit S
+        for (const tSuit of partnerTapkeySuits) {
+            const cardsInSuit = legal.filter(c => c.suit === tSuit);
+            if (cardsInSuit.length > 0) {
+                cardsInSuit.sort((a, b) => a.value - b.value);
+                return cardsInSuit[0];
+            }
+        }
+
+        // USER RULE 5:
+        // "stel we hebben alle 4 rang, dan is het aan het bot om te bepalen of het handig is
+        // wel of niet te spelen aan de hand van de rest van zijn kaarten en tapkeys"
+        // If all 4 have Rang (or bot + partner + 2 opponents), lead Rang if bot has master honors (Ace/King)
+        if (hasLegalTrumps && partnerHasRang && opponentsRangCount >= 2 && isDeclarantTeam) {
+            legalTrumps.sort((a, b) => b.value - a.value);
+            if (legalTrumps[0].value >= 13) {
+                return legalTrumps[0]; // Draw trumps with A or K
+            }
+        }
+
+        // CASH OUTSIDE WINNERS (Aces)
         const nonTrumpAces = legal.filter(c => c.suit !== trump && c.value === 14);
         if (nonTrumpAces.length > 0) {
             return nonTrumpAces[0];
         }
 
-        // 5. IF WE HAVE TRUMP LEAD REMAINING (even if opponents are out, run winning trumps)
-        if (myTrumps.length > 0) {
-            const legalTrumps = legal.filter(c => c.suit === trump);
-            if (legalTrumps.length > 0 && isDeclarantTeam) {
-                legalTrumps.sort((a, b) => b.value - a.value);
-                if (legalTrumps[0].value >= 12) {
-                    return legalTrumps[0];
-                }
-            }
-        }
-
-        // 6. DEFAULT LEAD: highest card in longest safe side suit, or lowest card
+        // If safe side suit exists, lead highest card in non-trump
         const nonTrump = legal.filter(c => c.suit !== trump);
         if (nonTrump.length > 0) {
+            // If opponents have 0 Rang, definitely prefer leading side suits!
             nonTrump.sort((a, b) => b.value - a.value);
             return nonTrump[0];
+        }
+
+        // Default fallback
+        if (hasLegalTrumps) {
+            legalTrumps.sort((a, b) => b.value - a.value);
+            return legalTrumps[0];
         }
 
         return this._lowestCard(legal);
@@ -2369,6 +2494,7 @@ class TekkaGame {
         // Playing
         this.trump = null;
         this.trumpRevealed = false;
+        this.openingTrumpLeadCard = null;
         this.currentTrick = [];             // {card, playerIndex}[]
         this.completedTricks = [];          // All completed tricks this hand
         this.trickNumber = 1;
@@ -2420,6 +2546,7 @@ class TekkaGame {
         this.forcedEight = false;
         this.trump = null;
         this.trumpRevealed = false;
+        this.openingTrumpLeadCard = null;
         this.currentTrick = [];
         this.completedTricks = [];
         this.trickNumber = 1;
@@ -2619,7 +2746,13 @@ class TekkaGame {
         }
 
         // Check legality
-        if (this.phase === PHASE.PLAYING) {
+        if (this.phase === PHASE.TRUMP_LEAD) {
+            const legal = TekkaRules.legalTrumpLeads(this.hands[seatIndex]);
+            const actualCard = this.hands[seatIndex][cardIdx];
+            if (!legal.some(c => c.id === actualCard.id || (c.suit === actualCard.suit && String(c.rank) === String(actualCard.rank)))) {
+                return { error: 'Illegal lead card for Rang: must be Ace or part of unbroken top honor sequence (A-K, A-K-Q, etc.)' };
+            }
+        } else if (this.phase === PHASE.PLAYING) {
             const legal = TekkaRules.legalCards(this.hands[seatIndex], this.currentTrick, this.trump);
             const actualCard = this.hands[seatIndex][cardIdx];
             if (!legal.some(c => c.id === actualCard.id || (c.suit === actualCard.suit && String(c.rank) === String(actualCard.rank)))) {
@@ -2634,6 +2767,7 @@ class TekkaGame {
         if (this.phase === PHASE.TRUMP_LEAD) {
             this.trump = playedCard.suit;
             this.trumpRevealed = true;
+            this.openingTrumpLeadCard = playedCard;
             this.phase = PHASE.PLAYING;
         }
 
@@ -2888,7 +3022,7 @@ class TekkaGame {
 
     getLegalCards(seatIndex) {
         if (this.phase === PHASE.TRUMP_LEAD && seatIndex === this.activePlayer) {
-            return [...this.hands[seatIndex]]; // Any card can be led to set trump
+            return TekkaRules.legalTrumpLeads(this.hands[seatIndex]);
         }
         return TekkaRules.legalCards(this.hands[seatIndex], this.currentTrick, this.trump);
     }
@@ -2910,6 +3044,7 @@ class TekkaGame {
             highBidder: this.highBidder,
             trump: this.trump,
             trumpRevealed: this.trumpRevealed,
+            openingTrumpLeadCard: this.openingTrumpLeadCard,
             trickNumber: this.trickNumber,
             teamTricks: this.teamTricks,
             tricksWon: this.tricksWon,
@@ -3955,7 +4090,7 @@ class TekkaUI {
             const isBotTurn = this.onlineMode ? (this.net.isHost && this.game.players[result.declarant].isBot) : (!this.game.players[result.declarant].isHuman);
 
             if (isMyTurn) {
-                this.showToast('🎴 You won the bid! Lead any card — that suit becomes RANG!', 4000);
+                this.showToast('🎴 You won the bid! Lead your Ace (or top sequence A-K, A-K-Q, etc.) to set RANG!', 4500);
                 this._enableHumanPlay();
             } else if (isBotTurn) {
                 setTimeout(() => this._doBotTrumpLead(result.declarant), this.botDelay);
@@ -3969,6 +4104,10 @@ class TekkaUI {
     _doBotTrumpLead(seatIndex) {
         const hand = this.game.getPlayerHand(seatIndex);
         const card = TekkaAI.chooseTrumpLead(hand, this.game.difficulty);
+        if (card.value < 14) {
+            const botName = this.game.players[seatIndex]?.name || 'Declarant';
+            this.showToast(`🎴 ${botName} leads ${card.rank} to set Rang! Signals holding all honors above ${card.rank} up to Ace!`, 4000);
+        }
         if (this.onlineMode && this.net.isHost) {
             this.net.sendCardPlayed(card, seatIndex);
         }
@@ -3979,7 +4118,12 @@ class TekkaUI {
         if (!this.elBidButtons) return;
         this.elBidButtons.innerHTML = '';
 
-        legalBids.forEach(bid => {
+        const isLastBidderAllPass = (this.game.biddingStep === 3 && this.game.highBid === null);
+        const filteredBids = isLastBidderAllPass
+            ? legalBids.filter(b => b !== BID.PASS && b !== 'pass' && b !== BID.TEER && b !== 'teer')
+            : legalBids;
+
+        filteredBids.forEach(bid => {
             const btn = document.createElement('button');
             let cls = 'bid-btn';
             let label = this._formatBid(bid);
