@@ -1981,9 +1981,10 @@ const TekkaRules = {
         };
     },
 
-    // Check if a hand is a valid misdeal (no honors)
+    // Check if a hand is a valid misdeal (must have at least one A, K, Q, or J)
     isMisdeal(hand) {
-        return !hand.some(c => c.isHonor);
+        if (!hand || hand.length === 0) return false;
+        return !hand.some(c => c.value >= 11);
     },
 
     // Sort hand by suit and rank (wrapper around sortHand)
@@ -2478,6 +2479,22 @@ class TekkaAI {
         const legalTrumps = legal.filter(c => c.suit === trump);
         const hasLegalTrumps = legalTrumps.length > 0;
 
+        // BAWAND PARTNER ON LEAD:
+        // Partner of Bawand declarant must never win tricks, lead lowest non-trump card to give lead back to declarant!
+        const isBawandPartnerLead = (
+            ctx.gameState &&
+            ctx.gameState.contractType === BID.BAWAND &&
+            ctx.isDeclarantTeam &&
+            ctx.botIndex !== ctx.gameState.declarant
+        );
+        if (isBawandPartnerLead) {
+            const nonTrump = legal.filter(c => c.suit !== trump);
+            if (nonTrump.length > 0) {
+                return this._lowestCard(nonTrump);
+            }
+            return this._lowestCard(legal);
+        }
+
         // USER RULE 1:
         // "wanneer je rang speelt, en de tegenstander heeft geen rang, dan is het niet slim
         // om rang te blijven spelen, want die van jou en je vriend raak je in 1 hand 2 rang kwijt,
@@ -2564,16 +2581,61 @@ class TekkaAI {
 
     // --- FOLLOWING STRATEGY ---
     static _chooseFollowCard(ctx) {
-        const { legal, trick, trump, myTeam, partnerTapkeySuits } = ctx;
+        const { legal, trick, trump, myTeam, partnerTapkeySuits, botIndex, gameState } = ctx;
         const ledSuit = trick[0].card.suit;
         const currentWinner = this._currentTrickWinner(trick, trump);
         const isPartnerWinning = (TekkaRules.teamOf(currentWinner.playerIndex) === myTeam);
 
+        // BAWAND PARTNER SPECIAL:
+        // Partner of Bawand declarant MUST NEVER win a trick, and must throw away high cards!
+        const isBawandPartner = (
+            gameState &&
+            gameState.contractType === BID.BAWAND &&
+            myTeam === gameState.declarantTeam &&
+            botIndex !== gameState.declarant
+        );
+
         const followingSuit = legal.filter(c => c.suit === ledSuit);
+
+        if (isBawandPartner) {
+            // Following suit: always play lowest card so declarant wins!
+            if (followingSuit.length > 0) {
+                return this._lowestCard(followingSuit);
+            }
+            // Void: NEVER trump! Discard highest non-trump honor (A, K, Q, J) to get rid of dangerous cards!
+            const nonTrump = legal.filter(c => c.suit !== trump);
+            if (nonTrump.length > 0) {
+                nonTrump.sort((a, b) => b.value - a.value);
+                return nonTrump[0];
+            }
+            return this._lowestCard(legal);
+        }
 
         if (followingSuit.length > 0) {
             // MUST FOLLOW SUIT
             if (isPartnerWinning) {
+                // LARIES OVERTAKING / UNBLOCKING RULE:
+                // When we bid Laries (all 13 tricks required), if partner played a card (especially when Kaat/void)
+                // and bot holds higher master cards in this suit (A, K...), bot MUST overtake partner's card
+                // (e.g. play A or K over partner's Q) to seize the lead and run the rest of the suit!
+                const isLaries = (gameState && (
+                    gameState.contractType === BID.LARIES ||
+                    gameState.contractType === 'double13' ||
+                    gameState.contractAmount === 13 ||
+                    gameState.highBid === BID.LARIES
+                ));
+                if (isLaries) {
+                    const higherCards = followingSuit.filter(c => c.value > currentWinner.card.value);
+                    if (higherCards.length > 0) {
+                        const partnerSeat = TekkaRules.partnerOf(botIndex);
+                        const partnerAnnouncedKaat = gameState.announcements?.[partnerSeat]?.kaat?.includes(ledSuit);
+                        const hasTopHonors = higherCards.some(c => c.value >= 13);
+                        if (partnerAnnouncedKaat || hasTopHonors || followingSuit.length >= 2) {
+                            higherCards.sort((a, b) => a.value - b.value);
+                            return higherCards[0];
+                        }
+                    }
+                }
                 // Partner is already winning the trick -> play lowest card to save high cards
                 return this._lowestCard(followingSuit);
             }
@@ -2740,59 +2802,73 @@ class TekkaGame {
         let deckCards = null;
         this.lastCutInfo = null;
 
-        const isClassic = (this.dealMode === 'classic' && this.stackedDeck && this.stackedDeck.length === 52);
+        const isClassic = (this.dealMode === 'classic' && this.stackedDeck && this.stackedDeck.length === 52 && !opts.forceShuffled);
 
-        if (isClassic) {
-            // Authentic Tekka Classic Cut:
-            // Two cuts in 2 portions:
-            // 1. Round winner cuts: top K1 cards move to bottom
-            const winTeam = (this.lastRoundWinnerTeam !== null && this.lastRoundWinnerTeam !== undefined)
-                ? this.lastRoundWinnerTeam : 0;
-            const oppTeam = 1 - winTeam;
+        let dealAttempts = 0;
+        let misdealHappened = false;
 
-            // Cut 1 (by winning team): slice top K1 cards and move to bottom
-            const k1 = Math.floor(Math.random() * 33) + 10; // Between 10 and 42 cards
-            let cutDeck = this.stackedDeck.slice(k1).concat(this.stackedDeck.slice(0, k1));
+        while (dealAttempts < 25) {
+            dealAttempts++;
 
-            // Cut 2 (by opponent team): slice top K2 cards and move to bottom
-            const k2 = Math.floor(Math.random() * 33) + 10; // Between 10 and 42 cards
-            cutDeck = cutDeck.slice(k2).concat(cutDeck.slice(0, k2));
+            if (isClassic && !misdealHappened) {
+                // Authentic Tekka Classic Cut:
+                // Two cuts in 2 portions:
+                // 1. Round winner cuts: top K1 cards move to bottom
+                const winTeam = (this.lastRoundWinnerTeam !== null && this.lastRoundWinnerTeam !== undefined)
+                    ? this.lastRoundWinnerTeam : 0;
+                const oppTeam = 1 - winTeam;
 
-            deckCards = cutDeck;
+                // Cut 1 (by winning team): slice top K1 cards and move to bottom
+                const k1 = Math.floor(Math.random() * 33) + 10; // Between 10 and 42 cards
+                let cutDeck = this.stackedDeck.slice(k1).concat(this.stackedDeck.slice(0, k1));
 
-            this.lastCutInfo = {
-                mode: 'classic',
-                winnerTeam: winTeam,
-                opponentTeam: oppTeam,
-                cut1: k1,
-                cut2: k2
-            };
+                // Cut 2 (by opponent team): slice top K2 cards and move to bottom
+                const k2 = Math.floor(Math.random() * 33) + 10; // Between 10 and 42 cards
+                cutDeck = cutDeck.slice(k2).concat(cutDeck.slice(0, k2));
 
-            // Packet deal: 13 cards per player in bidding order.
-            // "13 voor 1 persoon (39 over), dan van die 39 kaarten 13 naar de ander etc. de laatste bidder krijgt de resterende 13 kaarten."
-            // biddingOrder[0] gets cards 0..12
-            // biddingOrder[1] gets cards 13..25
-            // biddingOrder[2] gets cards 26..38
-            // biddingOrder[3] (the dealer / last bidder) gets cards 39..51
-            this.hands = [[], [], [], []];
-            for (let i = 0; i < 4; i++) {
-                const targetSeat = this.biddingOrder[i];
-                const packet = deckCards.slice(i * 13, (i + 1) * 13);
-                this.hands[targetSeat] = (typeof sortHand === 'function')
-                    ? sortHand(packet.map(c => new Card(c.suit, c.rank)))
-                    : packet.map(c => new Card(c.suit, c.rank));
+                deckCards = cutDeck;
+
+                this.lastCutInfo = {
+                    mode: 'classic',
+                    winnerTeam: winTeam,
+                    opponentTeam: oppTeam,
+                    cut1: k1,
+                    cut2: k2
+                };
+
+                // Packet deal: 13 cards per player in bidding order.
+                this.hands = [[], [], [], []];
+                for (let i = 0; i < 4; i++) {
+                    const targetSeat = this.biddingOrder[i];
+                    const packet = deckCards.slice(i * 13, (i + 1) * 13);
+                    this.hands[targetSeat] = (typeof sortHand === 'function')
+                        ? sortHand(packet.map(c => new Card(c.suit, c.rank)))
+                        : packet.map(c => new Card(c.suit, c.rank));
+                }
+            } else {
+                // Random Cut / Fresh full shuffle or redeal:
+                const deck = new Deck();
+                deck.shuffle();
+                const rawHands = deck.deal(4);
+                this.hands = (typeof sortHand === 'function')
+                    ? rawHands.map(h => sortHand(h))
+                    : rawHands;
+                this.lastCutInfo = {
+                    mode: 'random'
+                };
             }
-        } else {
-            // Random Cut / Fresh full shuffle:
-            const deck = new Deck();
-            deck.shuffle();
-            const rawHands = deck.deal(4);
-            this.hands = (typeof sortHand === 'function')
-                ? rawHands.map(h => sortHand(h))
-                : rawHands;
-            this.lastCutInfo = {
-                mode: 'random'
-            };
+
+            // User Rule: A hand must have at least one A, K, Q, J.
+            // If all cards are 10 or lower for ANY player, it is automatically redealt!
+            const hasMisdeal = this.hands.some(h => TekkaRules.isMisdeal(h));
+            if (!hasMisdeal) {
+                break;
+            }
+
+            // Rotate dealer on misdeal and redeal
+            misdealHappened = true;
+            this.dealer = TekkaRules.ccwNext(this.dealer);
+            this.biddingOrder = TekkaRules.biddingOrder(this.dealer);
         }
 
         // Reset trick piles for the new round
@@ -3156,8 +3232,9 @@ class TekkaGame {
 
         this.phase = PHASE.ROUND_END;
 
-        // Check game over (first team to 104+ points)
-        const gameOver = this.teamScores[0] >= TARGET_SCORE || this.teamScores[1] >= TARGET_SCORE;
+        // Check game over (first team to 104+ points, or 52-0 whitewash)
+        const goCheck = this._checkGameOver();
+        const gameOver = goCheck.gameOver;
         if (gameOver) {
             this.phase = PHASE.GAME_OVER;
         }
@@ -3174,7 +3251,49 @@ class TekkaGame {
             roundResult,
             teamScores: [...this.teamScores],
             gameOver,
-            gameWinner: gameOver ? (this.teamScores[0] >= TARGET_SCORE ? 0 : 1) : null
+            gameWinner: goCheck.winner,
+            whitewash: goCheck.whitewash
+        };
+    }
+
+    _checkGameOver() {
+        const s0 = this.teamScores[0];
+        const s1 = this.teamScores[1];
+
+        // 1. Whitewash / Skunk win: >= 52 points while opponent has 0 points!
+        // "wanneer iemand 52 of meer punten heeft, terwijl de andere team 0 punten heeft, dan heb je ook automatisch gewonnen"
+        if (s0 >= 52 && s1 === 0) {
+            return {
+                gameOver: true,
+                winner: 0,
+                whitewash: true,
+                reason: 'whitewash'
+            };
+        }
+        if (s1 >= 52 && s0 === 0) {
+            return {
+                gameOver: true,
+                winner: 1,
+                whitewash: true,
+                reason: 'whitewash'
+            };
+        }
+
+        // 2. Standard target score: first team to 104+ points
+        if (s0 >= TARGET_SCORE || s1 >= TARGET_SCORE) {
+            return {
+                gameOver: true,
+                winner: s0 >= TARGET_SCORE ? 0 : 1,
+                whitewash: false,
+                reason: 'target_reached'
+            };
+        }
+
+        return {
+            gameOver: false,
+            winner: null,
+            whitewash: false,
+            reason: null
         };
     }
 
@@ -3262,7 +3381,8 @@ class TekkaGame {
         });
 
         this.phase = PHASE.ROUND_END;
-        const gameOver = this.teamScores[0] >= TARGET_SCORE || this.teamScores[1] >= TARGET_SCORE;
+        const goCheck = this._checkGameOver();
+        const gameOver = goCheck.gameOver;
         if (gameOver) this.phase = PHASE.GAME_OVER;
 
         // In concedeOriginalBid, declarant team won
@@ -3273,7 +3393,8 @@ class TekkaGame {
             ok: true,
             roundEnd: true,
             gameOver,
-            winner: gameOver ? (this.teamScores[0] >= TARGET_SCORE ? 0 : 1) : null,
+            winner: goCheck.winner,
+            whitewash: goCheck.whitewash,
             roundResult
         };
     }
@@ -3322,7 +3443,8 @@ class TekkaGame {
                 teamScores: [...this.teamScores]
             });
             this.phase = PHASE.ROUND_END;
-            const gameOver = this.teamScores[0] >= TARGET_SCORE || this.teamScores[1] >= TARGET_SCORE;
+            const goCheck = this._checkGameOver();
+            const gameOver = goCheck.gameOver;
             if (gameOver) this.phase = PHASE.GAME_OVER;
 
             // Winner of round is defenders
@@ -3333,7 +3455,8 @@ class TekkaGame {
                 ok: true,
                 roundEnd: true,
                 gameOver,
-                winner: gameOver ? (this.teamScores[0] >= TARGET_SCORE ? 0 : 1) : null,
+                winner: goCheck.winner,
+                whitewash: goCheck.whitewash,
                 roundResult
             };
         } else {
@@ -4960,23 +5083,13 @@ class TekkaUI {
     }
 
     _submitBidRaise(newBid) {
-        const oldBid = this.game.highBid;
         if (!this.onlineMode) {
-            // Bot defenders decide whether to accept
-            const defTeam = 1 - this.game.declarantTeam;
-            const defTricks = this.game.teamTricks[defTeam];
-            const neededToDefeat = 14 - Number(newBid);
-            const botAccepts = (defTricks >= neededToDefeat - 2) && Math.random() < 0.45;
-            if (botAccepts) {
-                this.game.applyBidRaise(newBid);
-                this.game.highBid = newBid;
-                this.showToast(`✓ Opponents accepted raise to ${this._formatBid(newBid)} hands! Game continues.`, 3500);
-                this._updateContractDisplay();
-            } else {
-                this.showToast(`✕ Opponents declined raise! Conceded original ${this._formatBid(oldBid)} hands to you.`, 4000);
-                const result = this.game.concedeOriginalBid();
-                this._onRoundEnd(result);
-            }
+            // User rule: Bots ALWAYS accept the raise challenge, and declarant must make the raised contract!
+            this.game.applyBidRaise(newBid);
+            this.game.highBid = newBid;
+            this.showToast(`✓ Opponents accepted raise to ${this._formatBid(newBid)} hands! Play continues for ${newBid} hands.`, 4000);
+            this._updateContractDisplay();
+            this._updateRaiseBidButton();
         } else {
             this.net.sendBidRaiseRequest(newBid);
             this.showToast(`📨 Sent raise request to ${this._formatBid(newBid)} hands to opponents...`, 3000);
